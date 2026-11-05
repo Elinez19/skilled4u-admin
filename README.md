@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# skilled4U — Next.js Backend, Admin Dashboard & Landing Page
 
-## Getting Started
+Full-stack web backend, admin console, and marketing website for the **skilled4U** artisan marketplace ecosystem.
 
-First, run the development server:
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router, TypeScript, Server Components)
+- **Database**: Neon Serverless PostgreSQL (`skilled4u-db` / `empty-waterfall-76651473`)
+- **ORM**: Drizzle ORM + Drizzle Kit (`src/db/schema/`)
+- **Authentication**: Better-Auth (`admin` + `bearer` plugins for web & Expo mobile app)
+- **Payments & Escrow**: Bachs.io Payment Gateway (`src/lib/bachs.ts` + `/api/webhooks/bachs`)
+- **UI System**: shadcn/ui + Tailwind CSS v4 + Lucide Icons
+
+---
+
+## Quick Start
 
 ```bash
+cd C:\Users\elija\Desktop\skilled4u-web
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Landing Page Website**: `http://localhost:3000`
+- **Admin Sign In / Register**: `http://localhost:3000/login`
+- **Admin Dashboard Overview**: `http://localhost:3000/admin`
+- **Artisan NIN/KYC Verification Desk**: `http://localhost:3000/admin/artisans`
+- **Service Bookings & Dispatch**: `http://localhost:3000/admin/bookings`
+- **Bachs.io Escrow & Settlement Ledger**: `http://localhost:3000/admin/payments`
+- **Service Categories Manager**: `http://localhost:3000/admin/categories`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## Mobile App REST API Endpoints (`/api/v1`)
 
-To learn more about Next.js, take a look at the following resources:
+| Endpoint | Methods | Purpose |
+|---|---|---|
+| `/api/auth/[...all]` | `GET`, `POST` | Better-Auth session & mobile Bearer token endpoints |
+| `/api/v1/categories` | `GET`, `POST` | List or create marketplace service categories |
+| `/api/v1/artisans` | `GET`, `PATCH` | Query artisans or update KYC / online status |
+| `/api/v1/bookings` | `GET`, `POST`, `PATCH` | Create and update service bookings |
+| `/api/v1/payments/initialize` | `POST` | Initialize a Bachs.io escrow checkout session |
+| `/api/v1/payments/release` | `POST` | Release escrow & settle 90% payout to artisan's bank |
+| `/api/webhooks/bachs` | `POST` | HMAC-SHA256 verified Bachs.io webhook listener |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Database Scripts
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run db:generate   # Generate Drizzle SQL migrations
+npm run db:push       # Push schema changes directly to Neon PostgreSQL
+npm run db:seed       # Seed categories & artisans
+npm run db:studio     # Launch Drizzle Studio GUI
+```
