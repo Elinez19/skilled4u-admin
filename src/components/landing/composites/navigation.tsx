@@ -87,7 +87,47 @@ export function Preloader() {
 export function LandingNavbar() {
   const { navbar } = landingContent;
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = React.useState(false);
+  const currentPath = pathname ?? "";
+  const [openOnPath, setOpenOnPath] = React.useState<string | null>(null);
+  const mobileOpen = openOnPath === currentPath;
+  const headerRef = React.useRef<HTMLElement>(null);
+
+  const closeMobileMenu = React.useCallback(() => {
+    setOpenOnPath(null);
+  }, []);
+
+  const toggleMobileMenu = React.useCallback(() => {
+    setOpenOnPath((prev) => (prev === currentPath ? null : currentPath));
+  }, [currentPath]);
+
+  React.useEffect(() => {
+    if (!mobileOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeMobileMenu();
+      }
+    };
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      if (
+        headerRef.current &&
+        !headerRef.current.contains(event.target as Node)
+      ) {
+        closeMobileMenu();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("touchstart", handlePointerDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("touchstart", handlePointerDown);
+    };
+  }, [mobileOpen, closeMobileMenu]);
 
   const isLinkActive = (href: string, idx: number) => {
     if (pathname?.startsWith("/artisans") || pathname?.startsWith("/vendors")) {
@@ -109,10 +149,18 @@ export function LandingNavbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 px-3 sm:px-5 lg:px-7 pt-3 sm:pt-4">
-      <div className="surface-slab-blue mx-auto max-w-slab rounded-3xl sm:rounded-pill px-5 sm:px-8 py-3.5">
+    <header
+      ref={headerRef}
+      className="sticky top-0 z-40 px-3 sm:px-5 lg:px-7 pt-3 sm:pt-4"
+    >
+      {/* Top Navbar Slab */}
+      <div className="surface-slab-blue mx-auto max-w-slab rounded-2xl sm:rounded-3xl lg:rounded-pill border border-brand-400/45 px-5 sm:px-8 py-3.5">
         <div className="flex items-center justify-between gap-4">
-          <Link href="/" className="group focus:outline-none">
+          <Link
+            href="/"
+            onClick={closeMobileMenu}
+            className="group focus:outline-none"
+          >
             <BrandLogo tone="on-blue" />
           </Link>
 
@@ -140,7 +188,7 @@ export function LandingNavbar() {
           </nav>
 
           {/* Desktop CTA Pair (Strictly our 2 CTA variants) */}
-          <div className="hidden sm:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
             <CtaButton
               variant="secondary"
               size="md"
@@ -162,69 +210,102 @@ export function LandingNavbar() {
           {/* Mobile Menu Toggle */}
           <button
             type="button"
-            onClick={() => setMobileOpen((prev) => !prev)}
-            aria-label="Toggle menu"
-            className="sm:hidden grid h-11 w-11 place-items-center rounded-2xl bg-surface-porcelain text-brand-700"
+            onClick={toggleMobileMenu}
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-navigation-menu"
+            className="lg:hidden inline-flex h-11 w-11 items-center justify-center rounded-xl text-accent-gold transition-colors hover:text-accent-sky focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-sky cursor-pointer"
           >
-            {mobileOpen ? (
-              <X className="h-6 w-6" />
-            ) : (
-              <Menu className="h-6 w-6" />
-            )}
+            <AnimatePresence mode="wait" initial={false}>
+              {mobileOpen ? (
+                <motion.span
+                  key="close-icon"
+                  initial={{ opacity: 0, rotate: -45, scale: 0.85 }}
+                  animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                  exit={{ opacity: 0, rotate: 45, scale: 0.85 }}
+                  transition={{ duration: motionTokens.duration.fast * 0.6 }}
+                  className="grid place-items-center"
+                >
+                  <X className="h-7 w-7" strokeWidth={2} />
+                </motion.span>
+              ) : (
+                <motion.span
+                  key="menu-icon"
+                  initial={{ opacity: 0, rotate: 45, scale: 0.85 }}
+                  animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                  exit={{ opacity: 0, rotate: -45, scale: 0.85 }}
+                  transition={{ duration: motionTokens.duration.fast * 0.6 }}
+                  className="grid place-items-center"
+                >
+                  <Menu className="h-7 w-7" strokeWidth={2} />
+                </motion.span>
+              )}
+            </AnimatePresence>
           </button>
         </div>
+      </div>
 
-        {/* Mobile Drawer */}
-        <AnimatePresence>
-          {mobileOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={motionTokens.spring.snappy}
-              className="overflow-hidden sm:hidden"
-            >
-              <div className="mt-4 flex flex-col gap-3 border-t border-brand-400/30 pt-4 pb-2">
+      {/* Detached Floating Rounded Mobile Menu Card */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            id="mobile-navigation-menu"
+            initial={{ opacity: 0, y: -12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.98 }}
+            transition={motionTokens.spring.snappy}
+            className="lg:hidden absolute inset-x-3 sm:inset-x-5 top-full mt-2.5 z-50"
+          >
+            <div className="surface-slab-blue mx-auto max-w-slab rounded-card border border-brand-400/45 px-6 sm:px-8 py-7 sm:py-8">
+              <nav
+                aria-label="Mobile Primary"
+                className="flex flex-col gap-5 sm:gap-6"
+              >
                 {navbar.links.map((link, idx) => {
                   const active = isLinkActive(link.href, idx);
                   return (
                     <Link
                       key={link.label}
                       href={link.href}
-                      onClick={() => setMobileOpen(false)}
+                      onClick={closeMobileMenu}
                       className={
                         active
-                          ? "font-display text-lg font-extrabold text-accent-gold py-1"
-                          : "font-display text-lg font-extrabold text-ink-on-blue py-1"
+                          ? "font-display text-lg sm:text-xl font-bold text-accent-gold transition-colors hover:text-ink-on-blue"
+                          : "font-display text-lg sm:text-xl font-bold text-ink-on-blue transition-colors hover:text-accent-sky"
                       }
                     >
                       {link.label}
                     </Link>
                   );
                 })}
-                <div className="mt-2 grid grid-cols-1 gap-3">
-                  <CtaButton
-                    variant="secondary"
-                    size="md"
-                    leadingIcon="apple"
-                    href="#download"
-                  >
-                    {navbar.secondaryCta}
-                  </CtaButton>
-                  <CtaButton
-                    variant="primary"
-                    size="md"
-                    leadingIcon="play"
-                    href="#download"
-                  >
-                    {navbar.primaryCta}
-                  </CtaButton>
-                </div>
+              </nav>
+
+              <div className="mt-7 flex flex-col gap-3.5">
+                <CtaButton
+                  variant="secondary"
+                  size="lg"
+                  leadingIcon="apple"
+                  href="#download"
+                  onClick={closeMobileMenu}
+                  className="w-full"
+                >
+                  {navbar.secondaryCta}
+                </CtaButton>
+                <CtaButton
+                  variant="primary"
+                  size="lg"
+                  leadingIcon="play"
+                  href="#download"
+                  onClick={closeMobileMenu}
+                  className="w-full"
+                >
+                  {navbar.primaryCta}
+                </CtaButton>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }

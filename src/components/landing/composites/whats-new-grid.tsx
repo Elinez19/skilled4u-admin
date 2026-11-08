@@ -4,6 +4,7 @@ import * as React from "react";
 import { motion } from "framer-motion";
 import { Clock, MapPin, Sparkles, TrendingUp, Wrench } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { CtaButton } from "@/components/landing/ui/cta-button";
 import { SectionHeader, SectionSlab } from "@/components/landing/ui/section-slab";
 import { Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
@@ -370,6 +371,8 @@ export function WhatsNewCard({
   ctaHref?: string;
   onSelect?: (item: WhatsNewItem) => void;
 }) {
+  const resolvedHref = ctaHref ?? `/blog/${item.slug}`;
+
   return (
     <motion.article
       variants={cardHoverMotion}
@@ -379,7 +382,9 @@ export function WhatsNewCard({
     >
       <div>
         {/* Top Inset Rounded Visual Stage */}
-        <WhatsNewVisual type={item.visualType} />
+        <Link href={resolvedHref} className="block focus:outline-none">
+          <WhatsNewVisual type={item.visualType} />
+        </Link>
 
         {/* Category + Read Time Pill Row */}
         <div className="mt-5 flex items-center justify-between gap-2 px-2">
@@ -395,7 +400,12 @@ export function WhatsNewCard({
         {/* Card Headline & Description */}
         <div className="mt-3 px-2">
           <h3 className="font-display text-xl sm:text-2xl font-extrabold leading-snug text-ink-on-blue">
-            {item.title}
+            <Link
+              href={resolvedHref}
+              className="transition-colors hover:text-accent-sky focus:outline-none"
+            >
+              {item.title}
+            </Link>
           </h3>
           <p className="mt-2.5 text-sm sm:text-base font-medium leading-relaxed text-ink-on-blue-muted line-clamp-3">
             {item.description}
@@ -408,7 +418,7 @@ export function WhatsNewCard({
         <CtaButton
           variant="primary"
           size="md"
-          href={onSelect ? undefined : ctaHref}
+          href={onSelect ? undefined : resolvedHref}
           onClick={onSelect ? () => onSelect(item) : undefined}
           className="w-full"
         >
@@ -440,7 +450,7 @@ export function WhatsNewSection() {
             <WhatsNewCard
               item={item}
               ctaLabel={whatsNew.cardCta}
-              ctaHref={whatsNew.moreHref}
+              ctaHref={`/blog/${item.slug}`}
             />
           </StaggerItem>
         ))}

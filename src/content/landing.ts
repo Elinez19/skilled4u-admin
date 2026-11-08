@@ -53,14 +53,28 @@ export interface TestimonialItem {
   tiltDeg: number;
 }
 
+export type BlogBodyBlock =
+  | {
+      type: "paragraph";
+      text: string;
+    }
+  | {
+      type: "list";
+      leadIn: string;
+      items: readonly string[];
+    };
+
 export interface WhatsNewItem {
   id: string;
+  slug: string;
   categoryId: "offers" | "product-update" | "artisans";
   category: string;
   readTime: string;
   title: string;
+  highlightWords?: readonly string[];
   description: string;
   fullStory: string[];
+  bodyBlocks: readonly BlogBodyBlock[];
   visualType:
     | "reward"
     | "phones"
@@ -457,43 +471,193 @@ export const landingContent = {
     items: [
       {
         id: "new-1",
+        slug: "your-first-booking-pays-you-back",
         categoryId: "offers",
         category: "Offers",
         readTime: "3 mins read",
         title: "Your First Booking Pays You Back",
+        highlightWords: ["First", "Booking"],
         description:
           "At Skilled4U, we believe every great home repair experience should come with an extra reason to smile.",
         fullStory: [
           "Booking a reliable technician shouldn't just solve a problem at home—it should feel rewarding from the very first tap. That's why every new customer on Skilled4U receives an instant ₦2,000 wallet bonus and a free first diagnostic inspection.",
           "Once you create your account and confirm your Abuja address, your ₦2,000 First Booking Reward is automatically credited to your Skilled4U Wallet and ready to apply at checkout on AC servicing, plumbing, electrical work, carpentry, or deep cleaning.",
         ],
+        bodyBlocks: [
+          {
+            type: "paragraph",
+            text: "Booking a reliable technician shouldn't just solve a problem at home — it should feel rewarding from the very first tap, and that's exactly why your first booking on Skilled4U pays you back.",
+          },
+          {
+            type: "list",
+            leadIn: "Every new customer on Skilled4U unlocks:",
+            items: [
+              "An instant ₦2,000 First Booking Reward credited to your wallet",
+              "Zero callout inspection fee on your first diagnostic visit",
+              "Upfront service pricing before any work begins",
+              "Full Service Protection Guarantee across all trade categories",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "Once you create your account and confirm your Abuja address, your ₦2,000 reward is automatically added to your Skilled4U Wallet. Whether you're booking split-unit AC servicing in Wuse II, fixing a pipe leak in Maitama, or scheduling deep home cleaning in Jabi, your bonus applies seamlessly.",
+          },
+          {
+            type: "list",
+            leadIn: "You can redeem your First Booking Reward across:",
+            items: [
+              "AC & Refrigeration servicing and gas refills",
+              "Emergency plumbing and water pump repairs",
+              "Electrical fault finding and solar inverter setups",
+              "Custom carpentry, TV mounting, and home deep cleaning",
+            ],
+          },
+          {
+            type: "list",
+            leadIn: "Claiming your wallet bonus takes less than a minute:",
+            items: [
+              "Download the Skilled4U app on iOS or Android",
+              "Verify your phone number and Abuja neighbourhood",
+              "Pick any home or office service category",
+              "Select Skilled4U Wallet at checkout to apply your ₦2,000 bonus",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "Plus, every completed booking earns cashback loyalty points and referral rewards whenever you invite friends or neighbours across Abuja.",
+          },
+          {
+            type: "paragraph",
+            text: "Download the Skilled4U app today, claim your ₦2,000 First Booking Reward, and experience stress-free home repairs done right the first time.",
+          },
+        ],
         visualType: "reward",
       },
       {
         id: "new-2",
+        slug: "the-all-new-skilled4u-app-experience",
         categoryId: "product-update",
         category: "Product Update",
-        readTime: "4 mins read",
+        readTime: "2 mins read",
         title: "The All-New Skilled4U App Experience",
+        highlightWords: ["All-New", "Skilled4U"],
         description:
           "Booking your favourite plumber, electrician, or AC technician should be fast, simple, and enjoyable, and that's exactly what the new Skilled4U app delivers.",
         fullStory: [
           "We rebuilt the Skilled4U mobile experience from the ground up so homeowners and facility managers across Abuja can go from a leaking pipe or warm AC to a verified technician on the way in under 60 seconds.",
           "With upfront callout and service pricing, real-time GPS arrival tracking, video diagnostics before arrival, and instant escrow-protected wallet checkout, every fix is smoother from start to finish.",
         ],
+        bodyBlocks: [
+          {
+            type: "paragraph",
+            text: "Booking your favourite plumber, electrician, or AC technician should be fast, simple, and enjoyable — and that's exactly what the new Skilled4U app delivers.",
+          },
+          {
+            type: "list",
+            leadIn: "We've completely redesigned the app to make it:",
+            items: [
+              "Faster when browsing verified artisans and categories",
+              "Smoother to use",
+              "Easier to track bookings",
+              "More intuitive from start to finish",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "The updated experience makes discovering top-rated workshops, browsing upfront service menus, and placing bookings easier than ever before. Whether you're scheduling an urgent AC repair at work, fixing a leaking pipe at home, or booking weekend deep cleaning, everything feels effortless.",
+          },
+          {
+            type: "list",
+            leadIn: "Behind the scenes, the app has been optimized for:",
+            items: [
+              "Better speed",
+              "Improved stability",
+              "Cleaner layout and visuals",
+              "Seamless checkout and live artisan tracking",
+            ],
+          },
+          {
+            type: "list",
+            leadIn: "That means with the new Skilled4U app you can:",
+            items: [
+              "Find verified pros in seconds",
+              "Rebook favourites faster",
+              "Track artisan arrivals in real time",
+              "Get updates on every step of your booking",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "New features like 1-tap rebooking, 15-second video diagnostics, and smarter workshop recommendations mean you spend less time waiting and more time enjoying a comfortable home.",
+          },
+          {
+            type: "paragraph",
+            text: "Update or download the Skilled4U app today and experience a faster, cleaner, and more rewarding way to book trusted artisans.",
+          },
+        ],
         visualType: "phones",
       },
       {
         id: "new-3",
+        slug: "abuja-master-artisans-guild-is-now-on-skilled4u",
         categoryId: "artisans",
         category: "Artisans",
         readTime: "3 mins read",
         title: "Abuja Master Artisans Guild Is Now on Skilled4U",
+        highlightWords: ["Master", "Artisans"],
         description:
           "Renowned for rich, precision AC servicing, neat electrical wiring, custom carpentry, and fast 20-minute arrival across Wuse II, Maitama, and Gwarinpa...",
         fullStory: [
           "We are thrilled to welcome over 500 certified specialists from the Abuja Master Artisans Guild onto the Skilled4U platform—spanning Wuse II, Maitama, Gwarinpa, Jabi, Asokoro, and Garki.",
           "Each onboarded workshop has passed our hands-on trade assessment, identity verification, and upfront pricing pledge, bringing workshop-grade craftsmanship straight to your doorstep.",
+        ],
+        bodyBlocks: [
+          {
+            type: "paragraph",
+            text: "Finding a master craftsman you can trust with your home or office shouldn't feel like guesswork — and with the Abuja Master Artisans Guild now live on Skilled4U, world-class workmanship is only a tap away.",
+          },
+          {
+            type: "list",
+            leadIn: "Every Guild workshop onboarded onto Skilled4U has completed:",
+            items: [
+              "Hands-on technical trade testing and safety certification",
+              "Full government ID and workshop address verification",
+              "Standardized upfront pricing with zero hidden callout surprises",
+              "Real-time dispatch readiness across 15+ Abuja neighbourhoods",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "We are thrilled to welcome over 500 certified specialists from the Abuja Master Artisans Guild onto the Skilled4U platform. From Wuse II and Maitama to Gwarinpa, Jabi, Asokoro, and Garki, homeowners and facility managers can now book Guild-certified pros on demand.",
+          },
+          {
+            type: "list",
+            leadIn: "Guild specialists are available for immediate dispatch across:",
+            items: [
+              "Precision split & central AC diagnostics and gas refilling",
+              "Three-phase electrical wiring, changeover switches, and solar inverters",
+              "Bespoke cabinetry, security door locks, and wardrobe installations",
+              "High-pressure plumbing, borehole pumps, and water treatment",
+            ],
+          },
+          {
+            type: "list",
+            leadIn: "When you book an Abuja Master Artisans Guild member, you get:",
+            items: [
+              "20-minute average dispatch in core Abuja districts",
+              "Genuine replacement parts backed by workshop warranty",
+              "Escrow-protected payment released only when you're satisfied",
+              "48-hour post-service protection guarantee",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "Look out for the GoldVerified Guild badge on workshop profiles inside the Skilled4U app to book Abuja's finest trade specialists.",
+          },
+          {
+            type: "paragraph",
+            text: "Open the Skilled4U app today and book a certified Abuja Master Artisan for your next home or office fix.",
+          },
         ],
         visualType: "emblem",
       },
@@ -505,6 +669,13 @@ export const landingContent = {
       highlightWords: ["Good"],
       subtitle:
         "Product updates, home repair stories, artisan highlights, workshop spotlights, and everything we're building at Skilled4U.",
+    },
+    detail: {
+      defaultArticleId: "new-2",
+      shareLabel: "Share",
+      socials: ["IG", "𝕏", "in"] as const,
+      moreNewsHeadline: "More News",
+      moreNewsHighlightWords: ["News"] as const,
     },
     categories: [
       { id: "all", label: "All" },
@@ -518,85 +689,343 @@ export const landingContent = {
     items: [
       {
         id: "new-1",
+        slug: "your-first-booking-pays-you-back",
         categoryId: "offers",
         category: "Offers",
         readTime: "3 mins read",
         title: "Your First Booking Pays You Back",
+        highlightWords: ["First", "Booking"],
         description:
           "At Skilled4U, we believe every great home repair experience should come with an extra reason to smile.",
         fullStory: [
           "Booking a reliable technician shouldn't just solve a problem at home—it should feel rewarding from the very first tap. That's why every new customer on Skilled4U receives an instant ₦2,000 wallet bonus and a free first diagnostic inspection.",
           "Once you create your account and confirm your Abuja address, your ₦2,000 First Booking Reward is automatically credited to your Skilled4U Wallet and ready to apply at checkout on AC servicing, plumbing, electrical work, carpentry, or deep cleaning.",
         ],
+        bodyBlocks: [
+          {
+            type: "paragraph",
+            text: "Booking a reliable technician shouldn't just solve a problem at home — it should feel rewarding from the very first tap, and that's exactly why your first booking on Skilled4U pays you back.",
+          },
+          {
+            type: "list",
+            leadIn: "Every new customer on Skilled4U unlocks:",
+            items: [
+              "An instant ₦2,000 First Booking Reward credited to your wallet",
+              "Zero callout inspection fee on your first diagnostic visit",
+              "Upfront service pricing before any work begins",
+              "Full Service Protection Guarantee across all trade categories",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "Once you create your account and confirm your Abuja address, your ₦2,000 reward is automatically added to your Skilled4U Wallet. Whether you're booking split-unit AC servicing in Wuse II, fixing a pipe leak in Maitama, or scheduling deep home cleaning in Jabi, your bonus applies seamlessly.",
+          },
+          {
+            type: "list",
+            leadIn: "You can redeem your First Booking Reward across:",
+            items: [
+              "AC & Refrigeration servicing and gas refills",
+              "Emergency plumbing and water pump repairs",
+              "Electrical fault finding and solar inverter setups",
+              "Custom carpentry, TV mounting, and home deep cleaning",
+            ],
+          },
+          {
+            type: "list",
+            leadIn: "Claiming your wallet bonus takes less than a minute:",
+            items: [
+              "Download the Skilled4U app on iOS or Android",
+              "Verify your phone number and Abuja neighbourhood",
+              "Pick any home or office service category",
+              "Select Skilled4U Wallet at checkout to apply your ₦2,000 bonus",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "Plus, every completed booking earns cashback loyalty points and referral rewards whenever you invite friends or neighbours across Abuja.",
+          },
+          {
+            type: "paragraph",
+            text: "Download the Skilled4U app today, claim your ₦2,000 First Booking Reward, and experience stress-free home repairs done right the first time.",
+          },
+        ],
         visualType: "reward",
       },
       {
         id: "new-2",
+        slug: "the-all-new-skilled4u-app-experience",
         categoryId: "product-update",
         category: "Product Update",
-        readTime: "4 mins read",
+        readTime: "2 mins read",
         title: "The All-New Skilled4U App Experience",
+        highlightWords: ["All-New", "Skilled4U"],
         description:
           "Booking your favourite plumber, electrician, or AC technician should be fast, simple, and enjoyable, and that's exactly what the new Skilled4U app delivers.",
         fullStory: [
           "We rebuilt the Skilled4U mobile experience from the ground up so homeowners and facility managers across Abuja can go from a leaking pipe or warm AC to a verified technician on the way in under 60 seconds.",
           "With upfront callout and service pricing, real-time GPS arrival tracking, video diagnostics before arrival, and instant escrow-protected wallet checkout, every fix is smoother from start to finish.",
         ],
+        bodyBlocks: [
+          {
+            type: "paragraph",
+            text: "Booking your favourite plumber, electrician, or AC technician should be fast, simple, and enjoyable — and that's exactly what the new Skilled4U app delivers.",
+          },
+          {
+            type: "list",
+            leadIn: "We've completely redesigned the app to make it:",
+            items: [
+              "Faster when browsing verified artisans and categories",
+              "Smoother to use",
+              "Easier to track bookings",
+              "More intuitive from start to finish",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "The updated experience makes discovering top-rated workshops, browsing upfront service menus, and placing bookings easier than ever before. Whether you're scheduling an urgent AC repair at work, fixing a leaking pipe at home, or booking weekend deep cleaning, everything feels effortless.",
+          },
+          {
+            type: "list",
+            leadIn: "Behind the scenes, the app has been optimized for:",
+            items: [
+              "Better speed",
+              "Improved stability",
+              "Cleaner layout and visuals",
+              "Seamless checkout and live artisan tracking",
+            ],
+          },
+          {
+            type: "list",
+            leadIn: "That means with the new Skilled4U app you can:",
+            items: [
+              "Find verified pros in seconds",
+              "Rebook favourites faster",
+              "Track artisan arrivals in real time",
+              "Get updates on every step of your booking",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "New features like 1-tap rebooking, 15-second video diagnostics, and smarter workshop recommendations mean you spend less time waiting and more time enjoying a comfortable home.",
+          },
+          {
+            type: "paragraph",
+            text: "Update or download the Skilled4U app today and experience a faster, cleaner, and more rewarding way to book trusted artisans.",
+          },
+        ],
         visualType: "phones",
       },
       {
         id: "new-3",
+        slug: "abuja-master-artisans-guild-is-now-on-skilled4u",
         categoryId: "artisans",
         category: "Artisans",
         readTime: "3 mins read",
         title: "Abuja Master Artisans Guild Is Now on Skilled4U",
+        highlightWords: ["Master", "Artisans"],
         description:
           "Renowned for rich, precision AC servicing, neat electrical wiring, custom carpentry, and fast 20-minute arrival across Wuse II, Maitama, and Gwarinpa...",
         fullStory: [
           "We are thrilled to welcome over 500 certified specialists from the Abuja Master Artisans Guild onto the Skilled4U platform—spanning Wuse II, Maitama, Gwarinpa, Jabi, Asokoro, and Garki.",
           "Each onboarded workshop has passed our hands-on trade assessment, identity verification, and upfront pricing pledge, bringing workshop-grade craftsmanship straight to your doorstep.",
         ],
+        bodyBlocks: [
+          {
+            type: "paragraph",
+            text: "Finding a master craftsman you can trust with your home or office shouldn't feel like guesswork — and with the Abuja Master Artisans Guild now live on Skilled4U, world-class workmanship is only a tap away.",
+          },
+          {
+            type: "list",
+            leadIn: "Every Guild workshop onboarded onto Skilled4U has completed:",
+            items: [
+              "Hands-on technical trade testing and safety certification",
+              "Full government ID and workshop address verification",
+              "Standardized upfront pricing with zero hidden callout surprises",
+              "Real-time dispatch readiness across 15+ Abuja neighbourhoods",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "We are thrilled to welcome over 500 certified specialists from the Abuja Master Artisans Guild onto the Skilled4U platform. From Wuse II and Maitama to Gwarinpa, Jabi, Asokoro, and Garki, homeowners and facility managers can now book Guild-certified pros on demand.",
+          },
+          {
+            type: "list",
+            leadIn: "Guild specialists are available for immediate dispatch across:",
+            items: [
+              "Precision split & central AC diagnostics and gas refilling",
+              "Three-phase electrical wiring, changeover switches, and solar inverters",
+              "Bespoke cabinetry, security door locks, and wardrobe installations",
+              "High-pressure plumbing, borehole pumps, and water treatment",
+            ],
+          },
+          {
+            type: "list",
+            leadIn: "When you book an Abuja Master Artisans Guild member, you get:",
+            items: [
+              "20-minute average dispatch in core Abuja districts",
+              "Genuine replacement parts backed by workshop warranty",
+              "Escrow-protected payment released only when you're satisfied",
+              "48-hour post-service protection guarantee",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "Look out for the Gold Verified Guild badge on workshop profiles inside the Skilled4U app to book Abuja's finest trade specialists.",
+          },
+          {
+            type: "paragraph",
+            text: "Open the Skilled4U app today and book a certified Abuja Master Artisan for your next home or office fix.",
+          },
+        ],
         visualType: "emblem",
       },
       {
         id: "new-4",
+        slug: "20-percent-off-split-ac-servicing-and-gas-refill",
         categoryId: "offers",
         category: "Offers",
         readTime: "2 mins read",
         title: "20% Off Split AC Servicing & Gas Refill This Week",
+        highlightWords: ["20%", "Split", "AC"],
         description:
           "Beat the Abuja heat with crystal-cold air conditioning. Enjoy 20% off complete split-unit servicing, coil washing, and pressure gas refills across all districts.",
         fullStory: [
           "Keep your home and office cool all season long. For a limited time, Skilled4U is offering 20% off full split-unit AC maintenance and R410A/R22 gas refills booked through the app.",
           "Simply pick 'AC & Refrigeration' in the Skilled4U app, select your preferred time slot in Wuse II, Maitama, Gwarinpa, or Jabi, and your discount applies automatically at checkout.",
         ],
+        bodyBlocks: [
+          {
+            type: "paragraph",
+            text: "Keeping your home and office crystal-cold through the Abuja heat should be effortless and affordable — and this week, every split-unit AC service on Skilled4U comes with 20% off.",
+          },
+          {
+            type: "list",
+            leadIn: "Every discounted AC maintenance booking includes:",
+            items: [
+              "High-pressure indoor evaporator and outdoor condenser coil washing",
+              "Drainage pipe flushing to stop indoor water leaks",
+              "R410A or R22 refrigerant gas pressure testing and top-up",
+              "Full thermostat, capacitor, and airflow inspection",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "Routine servicing not only restores ice-cold airflow in minutes, it also reduces compressor power consumption on your prepaid meter and inverter batteries by up to 30%.",
+          },
+          {
+            type: "list",
+            leadIn: "How to book your 20% off AC service in seconds:",
+            items: [
+              "Open the Skilled4U app and tap AC & Refrigeration",
+              "Choose Split AC Servicing or AC Gas Refill",
+              "Pick your preferred arrival slot in Wuse II, Maitama, Gwarinpa, Jabi, or Asokoro",
+              "Enjoy automatic 20% savings applied right at checkout",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "Book for a single bedroom unit or schedule multi-unit servicing for your entire home or office branch with our verified cooling specialists.",
+          },
+        ],
         visualType: "referral",
       },
       {
         id: "new-5",
+        slug: "introducing-live-map-tracking-and-video-diagnostics",
         categoryId: "product-update",
         category: "Product Update",
         readTime: "3 mins read",
         title: "Introducing Live Map Tracking & Video Diagnostics",
+        highlightWords: ["Live", "Map", "Video"],
         description:
           "Show your artisan the fault before they set out and watch their dispatch scooter arrive in real time on the interactive Abuja neighbourhood map.",
         fullStory: [
           "No more guessing when your technician will arrive or whether they brought the right spare part. Upload a 15-second video clip when booking and follow your pro's live route right to your gate.",
           "Video Diagnostics helps our plumbers, electricians, and AC specialists pre-pack the exact replacement valves, capacitors, and tools needed to complete 94% of repairs on the very first visit.",
         ],
+        bodyBlocks: [
+          {
+            type: "paragraph",
+            text: "Waiting around wondering when your technician will arrive or whether they packed the right spare part is officially a thing of the past — thanks to Live Map Tracking and Video Diagnostics on Skilled4U.",
+          },
+          {
+            type: "list",
+            leadIn: "With 15-Second Video Diagnostics, you can:",
+            items: [
+              "Record or upload a short clip of the faulty AC, leaking pipe, or sparking socket",
+              "Let your matched artisan inspect the exact model and fault before leaving their workshop",
+              "Ensure your technician brings the right replacement valve, capacitor, or seal",
+              "Complete 94% of home repairs on the very first visit",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "As soon as your artisan confirms the booking and sets out, our new Live Map Tracking view activates automatically on your home screen.",
+          },
+          {
+            type: "list",
+            leadIn: "Live Map Tracking gives you complete visibility with:",
+            items: [
+              "Real-time GPS scooter movement across Abuja streets",
+              "Minute-by-minute arrival countdown updated for live traffic",
+              "Direct in-app chat and masked voice calls for gate instructions",
+              "Instant push alerts when your pro is 2 minutes away",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "Update your Skilled4U app today to try Video Diagnostics and Live Map Tracking on your next repair booking.",
+          },
+        ],
         visualType: "tracking",
       },
       {
         id: "new-6",
+        slug: "how-coolbreeze-tech-tripled-bookings-in-wuse-ii",
         categoryId: "artisans",
         category: "Artisans",
         readTime: "4 mins read",
         title: "How CoolBreeze Tech Tripled Bookings in Wuse II",
+        highlightWords: ["CoolBreeze", "Tripled"],
         description:
           "From a two-man AC workshop in Wuse Zone 4 to one of Abuja's highest-rated service teams on Skilled4U—discover how digital dispatch transformed their craft.",
         fullStory: [
           "Before joining Skilled4U, CoolBreeze Tech relied solely on word-of-mouth referrals. Within 60 days of going live on Skilled4U Pro, their team expanded to six certified technicians serving Wuse II, Maitama, and Jabi daily.",
           "With instant wallet payouts and automated job routing, their technicians spend less time stuck in traffic looking for customers and more time delivering five-star cooling repairs.",
+        ],
+        bodyBlocks: [
+          {
+            type: "paragraph",
+            text: "Two years ago, CoolBreeze Tech was a two-man refrigeration workshop in Wuse Zone 4 relying entirely on word-of-mouth calls — today, they are one of Abuja's busiest 4.9-star service teams on Skilled4U.",
+          },
+          {
+            type: "list",
+            leadIn: "Joining Skilled4U Pro helped CoolBreeze Tech transform their daily operations:",
+            items: [
+              "3x increase in completed weekly AC and refrigeration bookings",
+              "Automated proximity matching with homeowners in Wuse II, Maitama, and Jabi",
+              "Zero time wasted negotiating callout fees thanks to upfront pricing",
+              "Instant Pro Wallet payouts after every confirmed repair",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "By using Video Diagnostics before dispatch, CoolBreeze Tech's technicians review customer clips in advance, pack the exact compressor capacitors and gas gauges needed, and arrive on scooters in under 20 minutes.",
+          },
+          {
+            type: "list",
+            leadIn: "With the Skilled4U multi-technician workshop dashboard, their team now:",
+            items: [
+              "Manages six verified field technicians from one screen",
+              "Tracks live job completion and customer ratings in real time",
+              "Schedules recurring monthly office AC maintenance across Central Area",
+              "Unlocks weekly top-rated artisan performance bonuses",
+            ],
+          },
+          {
+            type: "paragraph",
+            text: "Whether you're an independent master tradesperson or run a growing Abuja workshop, Skilled4U gives your skill the crowd it deserves.",
+          },
         ],
         visualType: "business",
       },
@@ -989,3 +1418,29 @@ export const landingContent = {
   },
 } as const;
 
+export function getBlogArticleBySlug(slugOrId?: string): WhatsNewItem {
+  const { items, detail } = landingContent.blogPage;
+  const fallback =
+    items.find((item) => item.id === detail.defaultArticleId) ?? items[0];
+
+  if (!slugOrId) {
+    return fallback;
+  }
+
+  const normalized = decodeURIComponent(slugOrId).trim().toLowerCase();
+  const match = items.find(
+    (item) =>
+      item.slug.toLowerCase() === normalized ||
+      item.id.toLowerCase() === normalized
+  );
+
+  return match ?? fallback;
+}
+
+export function getRelatedBlogArticles(
+  currentId: string,
+  count = 2
+): WhatsNewItem[] {
+  const { items } = landingContent.blogPage;
+  return items.filter((item) => item.id !== currentId).slice(0, count);
+}
