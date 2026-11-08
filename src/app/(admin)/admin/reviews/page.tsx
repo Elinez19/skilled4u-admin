@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { AdminActionMenu } from "@/components/admin/ui/admin-action-menu";
 import {
+  AdminCheckbox,
   AdminDataTable,
   AdminEmptyState,
   AdminTable,
@@ -115,6 +116,7 @@ export default function AdminReviewsPage() {
   const [items, setItems] = React.useState<ReviewRecord[]>(INITIAL_REVIEWS);
   const [filter, setFilter] = React.useState<ReviewFilter>("all");
   const [search, setSearch] = React.useState("");
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
   // Inline Form State
   const [formOpen, setFormOpen] = React.useState(true);
@@ -425,6 +427,52 @@ export default function AdminReviewsPage() {
             title="Customer Reviews & Ratings Ledger"
             subtitle="Verify customer feedback from completed service bookings and use the three-dots menu to edit, publish, or moderate."
             badge={`${filtered.length} Showing`}
+            selectedCount={selectedIds.length}
+            bulkActions={
+              <>
+                <CtaButton
+                  variant="secondary"
+                  size="xs"
+                  onClick={() => {
+                    setItems((prev) =>
+                      prev.map((r) =>
+                        selectedIds.includes(r.id)
+                          ? { ...r, status: "verified" }
+                          : r
+                      )
+                    );
+                    notifySaved(`Verified ${selectedIds.length} review(s)`);
+                    setSelectedIds([]);
+                  }}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 text-accent-success" />
+                  <span>Verify Selected</span>
+                </CtaButton>
+                <CtaButton
+                  variant="secondary"
+                  size="xs"
+                  className="text-accent-error hover:border-accent-error/40 hover:text-accent-error"
+                  onClick={() => {
+                    const count = selectedIds.length;
+                    setItems((prev) =>
+                      prev.filter((r) => !selectedIds.includes(r.id))
+                    );
+                    notifySaved(`Removed ${count} review record(s)`);
+                    setSelectedIds([]);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Remove Selected</span>
+                </CtaButton>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds([])}
+                  className="text-xs font-bold text-ink-secondary hover:text-brand-900 transition-colors px-1"
+                >
+                  Clear
+                </button>
+              </>
+            }
             headerAction={
               <CtaButton
                 variant="primary"
@@ -449,12 +497,37 @@ export default function AdminReviewsPage() {
               <AdminTable>
                 <AdminTableHeader>
                   <AdminTableRow>
-                    <AdminTableHead>Client</AdminTableHead>
-                    <AdminTableHead>Artisan Pro</AdminTableHead>
-                    <AdminTableHead>Rating</AdminTableHead>
-                    <AdminTableHead>
-                      Service &amp; Review Comment
+                    <AdminTableHead className="w-10">
+                      <AdminCheckbox
+                        aria-label="Select all reviews"
+                        checked={
+                          filtered.length > 0 &&
+                          filtered.every((r) => selectedIds.includes(r.id))
+                        }
+                        indeterminate={
+                          filtered.some((r) => selectedIds.includes(r.id)) &&
+                          !filtered.every((r) => selectedIds.includes(r.id))
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds((prev) => [
+                              ...prev,
+                              ...filtered
+                                .filter((r) => !prev.includes(r.id))
+                                .map((r) => r.id),
+                            ]);
+                          } else {
+                            const fIds = new Set(filtered.map((r) => r.id));
+                            setSelectedIds((prev) =>
+                              prev.filter((id) => !fIds.has(id))
+                            );
+                          }
+                        }}
+                      />
                     </AdminTableHead>
+                    <AdminTableHead>Client &amp; Pro</AdminTableHead>
+                    <AdminTableHead>Service</AdminTableHead>
+                    <AdminTableHead>Rating</AdminTableHead>
                     <AdminTableHead>Status</AdminTableHead>
                     <AdminTableHead className="text-right">
                       Actions
@@ -463,18 +536,37 @@ export default function AdminReviewsPage() {
                 </AdminTableHeader>
                 <AdminTableBody>
                   {filtered.map((rev) => (
-                    <AdminTableRow key={rev.id}>
+                    <AdminTableRow
+                      key={rev.id}
+                      isSelected={selectedIds.includes(rev.id)}
+                    >
+                      <AdminTableCell className="w-10">
+                        <AdminCheckbox
+                          aria-label={`Select review by ${rev.clientName}`}
+                          checked={selectedIds.includes(rev.id)}
+                          onChange={() => {
+                            setSelectedIds((prev) =>
+                              prev.includes(rev.id)
+                                ? prev.filter((id) => id !== rev.id)
+                                : [...prev, rev.id]
+                            );
+                          }}
+                        />
+                      </AdminTableCell>
+
                       <AdminTableCell className="whitespace-nowrap">
                         <div className="font-display text-xs font-extrabold text-brand-950">
                           {rev.clientName}
                         </div>
-                        <div className="text-[10px] font-semibold text-ink-muted">
-                          {rev.createdAt}
+                        <div className="text-[11px] font-semibold text-brand-600">
+                          Pro: {rev.artisanName}
                         </div>
                       </AdminTableCell>
 
-                      <AdminTableCell className="font-display text-xs font-extrabold text-brand-700 whitespace-nowrap">
-                        {rev.artisanName}
+                      <AdminTableCell className="max-w-[240px]">
+                        <div className="truncate font-display text-xs font-extrabold text-brand-950">
+                          {rev.serviceTitle}
+                        </div>
                       </AdminTableCell>
 
                       <AdminTableCell className="whitespace-nowrap">
@@ -482,15 +574,6 @@ export default function AdminReviewsPage() {
                           <Star className="h-3 w-3 fill-accent-gold text-accent-gold" />
                           <span>{rev.rating}.0</span>
                         </div>
-                      </AdminTableCell>
-
-                      <AdminTableCell className="max-w-[320px]">
-                        <div className="truncate font-display text-xs font-extrabold text-brand-950">
-                          {rev.serviceTitle}
-                        </div>
-                        <p className="truncate text-[11px] font-medium text-ink-secondary">
-                          {rev.comment}
-                        </p>
                       </AdminTableCell>
 
                       <AdminTableCell>

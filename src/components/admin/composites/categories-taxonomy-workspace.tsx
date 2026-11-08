@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { resolveCategoryArtwork } from "@/components/admin/composites/overview-dashboard";
 import { AdminActionMenu } from "@/components/admin/ui/admin-action-menu";
 import {
+  AdminCheckbox,
   AdminDataTable,
   AdminEmptyState,
   AdminTable,
@@ -125,6 +126,12 @@ export function CategoriesTaxonomyWorkspace({
   );
   const [tab, setTab] = React.useState<CatalogTab>("all");
   const [search, setSearch] = React.useState("");
+  const [selectedCategoryIds, setSelectedCategoryIds] = React.useState<
+    string[]
+  >([]);
+  const [selectedServiceIds, setSelectedServiceIds] = React.useState<string[]>(
+    []
+  );
 
   // Inline Form State (replaces modal)
   const [formOpen, setFormOpen] = React.useState(true);
@@ -708,6 +715,34 @@ export function CategoriesTaxonomyWorkspace({
               title="Service Categories Directory"
               subtitle="Manage marketplace service categories, starting prices, and bookable sub-service offerings."
               badge={`${filteredCategories.length} Categories`}
+              selectedCount={selectedCategoryIds.length}
+              bulkActions={
+                <>
+                  <CtaButton
+                    variant="secondary"
+                    size="xs"
+                    className="text-accent-error hover:border-accent-error/40 hover:text-accent-error"
+                    onClick={() => {
+                      const count = selectedCategoryIds.length;
+                      setItems((prev) =>
+                        prev.filter((c) => !selectedCategoryIds.includes(c.id))
+                      );
+                      notifySaved(`Removed ${count} category record(s)`);
+                      setSelectedCategoryIds([]);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Remove Selected</span>
+                  </CtaButton>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategoryIds([])}
+                    className="text-xs font-bold text-ink-secondary hover:text-brand-900 transition-colors px-1"
+                  >
+                    Clear
+                  </button>
+                </>
+              }
               headerAction={
                 <CtaButton
                   variant="primary"
@@ -732,8 +767,43 @@ export function CategoriesTaxonomyWorkspace({
                 <AdminTable>
                   <AdminTableHeader>
                     <AdminTableRow>
+                      <AdminTableHead className="w-10">
+                        <AdminCheckbox
+                          aria-label="Select all categories"
+                          checked={
+                            filteredCategories.length > 0 &&
+                            filteredCategories.every((c) =>
+                              selectedCategoryIds.includes(c.id)
+                            )
+                          }
+                          indeterminate={
+                            filteredCategories.some((c) =>
+                              selectedCategoryIds.includes(c.id)
+                            ) &&
+                            !filteredCategories.every((c) =>
+                              selectedCategoryIds.includes(c.id)
+                            )
+                          }
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedCategoryIds((prev) => [
+                                ...prev,
+                                ...filteredCategories
+                                  .filter((c) => !prev.includes(c.id))
+                                  .map((c) => c.id),
+                              ]);
+                            } else {
+                              const fIds = new Set(
+                                filteredCategories.map((c) => c.id)
+                              );
+                              setSelectedCategoryIds((prev) =>
+                                prev.filter((id) => !fIds.has(id))
+                              );
+                            }
+                          }}
+                        />
+                      </AdminTableHead>
                       <AdminTableHead>Category &amp; Slug</AdminTableHead>
-                      <AdminTableHead>Description</AdminTableHead>
                       <AdminTableHead>Bookable Sub-Services</AdminTableHead>
                       <AdminTableHead>Base Price</AdminTableHead>
                       <AdminTableHead>Status</AdminTableHead>
@@ -744,7 +814,24 @@ export function CategoriesTaxonomyWorkspace({
                   </AdminTableHeader>
                   <AdminTableBody>
                     {filteredCategories.map((cat) => (
-                      <AdminTableRow key={cat.id}>
+                      <AdminTableRow
+                        key={cat.id}
+                        isSelected={selectedCategoryIds.includes(cat.id)}
+                      >
+                        <AdminTableCell className="w-10">
+                          <AdminCheckbox
+                            aria-label={`Select category ${cat.title}`}
+                            checked={selectedCategoryIds.includes(cat.id)}
+                            onChange={() => {
+                              setSelectedCategoryIds((prev) =>
+                                prev.includes(cat.id)
+                                  ? prev.filter((id) => id !== cat.id)
+                                  : [...prev, cat.id]
+                              );
+                            }}
+                          />
+                        </AdminTableCell>
+
                         <AdminTableCell className="whitespace-nowrap">
                           <div className="font-display text-xs sm:text-sm font-extrabold text-brand-950">
                             {cat.title}
@@ -752,12 +839,6 @@ export function CategoriesTaxonomyWorkspace({
                           <div className="font-mono text-[10px] font-semibold text-ink-muted">
                             /{cat.slug}
                           </div>
-                        </AdminTableCell>
-
-                        <AdminTableCell className="max-w-[260px]">
-                          <p className="truncate text-xs font-medium text-ink-secondary">
-                            {cat.description}
-                          </p>
                         </AdminTableCell>
 
                         <AdminTableCell>
@@ -845,13 +926,41 @@ export function CategoriesTaxonomyWorkspace({
           </div>
         )}
 
-        {/* Bookable Services Table with Three-Dots Action Button & Dropdown CTAs */}
+        {/* Bookable Services Table with Checkboxes & Essential Columns */}
         {(tab === "all" || tab === "services") && (
           <div className="mt-5">
             <AdminDataTable
               title="Bookable Services & Standard Pricing Ledger"
               subtitle="Manage individual customer-bookable services, estimated job durations, and dispatch SLA tiers."
               badge={`${filteredServices.length} Services`}
+              selectedCount={selectedServiceIds.length}
+              bulkActions={
+                <>
+                  <CtaButton
+                    variant="secondary"
+                    size="xs"
+                    className="text-accent-error hover:border-accent-error/40 hover:text-accent-error"
+                    onClick={() => {
+                      const count = selectedServiceIds.length;
+                      setServices((prev) =>
+                        prev.filter((s) => !selectedServiceIds.includes(s.id))
+                      );
+                      notifySaved(`Removed ${count} service record(s)`);
+                      setSelectedServiceIds([]);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Remove Selected</span>
+                  </CtaButton>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedServiceIds([])}
+                    className="text-xs font-bold text-ink-secondary hover:text-brand-900 transition-colors px-1"
+                  >
+                    Clear
+                  </button>
+                </>
+              }
               headerAction={
                 <CtaButton
                   variant="primary"
@@ -876,9 +985,44 @@ export function CategoriesTaxonomyWorkspace({
                 <AdminTable>
                   <AdminTableHeader>
                     <AdminTableRow>
+                      <AdminTableHead className="w-10">
+                        <AdminCheckbox
+                          aria-label="Select all services"
+                          checked={
+                            filteredServices.length > 0 &&
+                            filteredServices.every((s) =>
+                              selectedServiceIds.includes(s.id)
+                            )
+                          }
+                          indeterminate={
+                            filteredServices.some((s) =>
+                              selectedServiceIds.includes(s.id)
+                            ) &&
+                            !filteredServices.every((s) =>
+                              selectedServiceIds.includes(s.id)
+                            )
+                          }
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedServiceIds((prev) => [
+                                ...prev,
+                                ...filteredServices
+                                  .filter((s) => !prev.includes(s.id))
+                                  .map((s) => s.id),
+                              ]);
+                            } else {
+                              const fIds = new Set(
+                                filteredServices.map((s) => s.id)
+                              );
+                              setSelectedServiceIds((prev) =>
+                                prev.filter((id) => !fIds.has(id))
+                              );
+                            }
+                          }}
+                        />
+                      </AdminTableHead>
                       <AdminTableHead>Service Title</AdminTableHead>
                       <AdminTableHead>Parent Category</AdminTableHead>
-                      <AdminTableHead>Duration &amp; SLA</AdminTableHead>
                       <AdminTableHead>Standard Rate</AdminTableHead>
                       <AdminTableHead>Status</AdminTableHead>
                       <AdminTableHead className="text-right">
@@ -888,40 +1032,48 @@ export function CategoriesTaxonomyWorkspace({
                   </AdminTableHeader>
                   <AdminTableBody>
                     {filteredServices.map((srv) => (
-                      <AdminTableRow key={srv.id}>
-                        <AdminTableCell>
-                          <div className="font-display text-xs sm:text-sm font-extrabold text-brand-950">
-                            {srv.title}
-                          </div>
-                        </AdminTableCell>
+                      <AdminTableRow
+                        key={srv.id}
+                        isSelected={selectedServiceIds.includes(srv.id)}
+                      >
+                        <AdminTableCell className="w-10">
+                          <AdminCheckbox
+                            aria-label={`Select service ${srv.title}`}
+                            checked={selectedServiceIds.includes(srv.id)}
+                            onChange={() => {
+                              setSelectedServiceIds((prev) =>
+                                prev.includes(srv.id)
+                                ? prev.filter((id) => id !== srv.id)
+                                : [...prev, srv.id]
+                            );
+                          }}
+                        />
+                      </AdminTableCell>
 
-                        <AdminTableCell className="whitespace-nowrap">
-                          <PillBadge
-                            tone="porcelain"
-                            className="px-2.5 py-0.5 text-[10px]"
-                          >
-                            {srv.categoryTitle}
-                          </PillBadge>
-                        </AdminTableCell>
+                      <AdminTableCell>
+                        <div className="font-display text-xs sm:text-sm font-extrabold text-brand-950">
+                          {srv.title}
+                        </div>
+                      </AdminTableCell>
 
-                        <AdminTableCell className="whitespace-nowrap">
-                          <div className="text-xs font-bold text-brand-800">
-                            {srv.duration}
-                          </div>
-                          <div className="text-[10px] font-semibold text-ink-secondary">
-                            SLA: {srv.dispatchSla}
-                          </div>
-                        </AdminTableCell>
+                      <AdminTableCell className="whitespace-nowrap">
+                        <PillBadge
+                          tone="porcelain"
+                          className="px-2.5 py-0.5 text-[10px]"
+                        >
+                          {srv.categoryTitle}
+                        </PillBadge>
+                      </AdminTableCell>
 
-                        <AdminTableCell className="font-display text-xs sm:text-sm font-extrabold text-brand-950 whitespace-nowrap">
-                          {formatCurrency(srv.price)}
-                        </AdminTableCell>
+                      <AdminTableCell className="font-display text-xs sm:text-sm font-extrabold text-brand-950 whitespace-nowrap">
+                        {formatCurrency(srv.price)}
+                      </AdminTableCell>
 
-                        <AdminTableCell>
-                          <AdminStatusPill status={srv.status} />
-                        </AdminTableCell>
+                      <AdminTableCell>
+                        <AdminStatusPill status={srv.status} />
+                      </AdminTableCell>
 
-                        <AdminTableCell className="text-right whitespace-nowrap">
+                      <AdminTableCell className="text-right whitespace-nowrap">
                           <AdminActionMenu
                             label={`Service: ${srv.title}`}
                             ariaLabel={`Actions for service ${srv.title}`}

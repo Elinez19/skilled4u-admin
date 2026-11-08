@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { AdminActionMenu } from "@/components/admin/ui/admin-action-menu";
 import {
+  AdminCheckbox,
   AdminDataTable,
   AdminEmptyState,
   AdminTable,
@@ -130,6 +131,7 @@ export default function AdminSettingsPage() {
     React.useState<PolicySettingItem[]>(INITIAL_POLICIES);
   const [filter, setFilter] = React.useState<PolicyCategory>("all");
   const [search, setSearch] = React.useState("");
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
   // Core KPI & Global Settings state
   const [platformFeePercent, setPlatformFeePercent] = React.useState("10");
@@ -570,12 +572,40 @@ export default function AdminSettingsPage() {
           />
         </div>
 
-        {/* Settings & Policies Table with Three-Dots Action Button & Dropdown CTAs */}
+        {/* Settings & Policies Table with Checkboxes & Essential Columns */}
         <div className="mt-4">
           <AdminDataTable
             title="Platform Settings & Governance Rules Ledger"
             subtitle="Inspect active marketplace configuration rules and use the three-dots action menu to edit, pause, or reset any setting."
             badge={`${filtered.length} Rules`}
+            selectedCount={selectedIds.length}
+            bulkActions={
+              <>
+                <CtaButton
+                  variant="secondary"
+                  size="xs"
+                  className="text-accent-error hover:border-accent-error/40 hover:text-accent-error"
+                  onClick={() => {
+                    const count = selectedIds.length;
+                    setPolicies((prev) =>
+                      prev.filter((p) => !selectedIds.includes(p.id))
+                    );
+                    notifySaved(`Removed ${count} setting rule(s)`);
+                    setSelectedIds([]);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Remove Selected</span>
+                </CtaButton>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds([])}
+                  className="text-xs font-bold text-ink-secondary hover:text-brand-900 transition-colors px-1"
+                >
+                  Clear
+                </button>
+              </>
+            }
             headerAction={
               <CtaButton
                 variant="primary"
@@ -600,10 +630,37 @@ export default function AdminSettingsPage() {
               <AdminTable>
                 <AdminTableHeader>
                   <AdminTableRow>
+                    <AdminTableHead className="w-10">
+                      <AdminCheckbox
+                        aria-label="Select all settings"
+                        checked={
+                          filtered.length > 0 &&
+                          filtered.every((p) => selectedIds.includes(p.id))
+                        }
+                        indeterminate={
+                          filtered.some((p) => selectedIds.includes(p.id)) &&
+                          !filtered.every((p) => selectedIds.includes(p.id))
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds((prev) => [
+                              ...prev,
+                              ...filtered
+                                .filter((p) => !prev.includes(p.id))
+                                .map((p) => p.id),
+                            ]);
+                          } else {
+                            const fIds = new Set(filtered.map((p) => p.id));
+                            setSelectedIds((prev) =>
+                              prev.filter((id) => !fIds.has(id))
+                            );
+                          }
+                        }}
+                      />
+                    </AdminTableHead>
                     <AdminTableHead>Setting &amp; Key</AdminTableHead>
                     <AdminTableHead>Category</AdminTableHead>
                     <AdminTableHead>Configured Value</AdminTableHead>
-                    <AdminTableHead>Operational Scope</AdminTableHead>
                     <AdminTableHead>Status</AdminTableHead>
                     <AdminTableHead className="text-right">
                       Actions
@@ -612,7 +669,24 @@ export default function AdminSettingsPage() {
                 </AdminTableHeader>
                 <AdminTableBody>
                   {filtered.map((item) => (
-                    <AdminTableRow key={item.id}>
+                    <AdminTableRow
+                      key={item.id}
+                      isSelected={selectedIds.includes(item.id)}
+                    >
+                      <AdminTableCell className="w-10">
+                        <AdminCheckbox
+                          aria-label={`Select setting ${item.title}`}
+                          checked={selectedIds.includes(item.id)}
+                          onChange={() => {
+                            setSelectedIds((prev) =>
+                              prev.includes(item.id)
+                                ? prev.filter((id) => id !== item.id)
+                                : [...prev, item.id]
+                            );
+                          }}
+                        />
+                      </AdminTableCell>
+
                       <AdminTableCell className="whitespace-nowrap">
                         <div className="font-display text-xs font-extrabold text-brand-950">
                           {item.title}
@@ -635,12 +709,6 @@ export default function AdminSettingsPage() {
                         <span className="font-display text-xs sm:text-sm font-extrabold text-brand-950">
                           {item.value}
                         </span>
-                      </AdminTableCell>
-
-                      <AdminTableCell className="max-w-[280px]">
-                        <p className="truncate text-xs font-medium text-ink-secondary">
-                          {item.description}
-                        </p>
                       </AdminTableCell>
 
                       <AdminTableCell>

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { AdminActionMenu } from "@/components/admin/ui/admin-action-menu";
 import {
+  AdminCheckbox,
   AdminDataTable,
   AdminEmptyState,
   AdminTable,
@@ -123,6 +124,7 @@ export default function AdminSupportPage() {
   const [items, setItems] = React.useState<SupportTicket[]>(INITIAL_TICKETS);
   const [filter, setFilter] = React.useState<TicketFilter>("all");
   const [search, setSearch] = React.useState("");
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
   // Inline Form State
   const [formOpen, setFormOpen] = React.useState(true);
@@ -454,12 +456,58 @@ export default function AdminSupportPage() {
           />
         </div>
 
-        {/* Support Table with Three-Dots Action Button & Dropdown CTAs */}
+        {/* Support Table with Checkboxes, Bulk Actions & Three-Dots Menu */}
         <div className="mt-4">
           <AdminDataTable
             title="Live Support & Helpdesk Queue"
             subtitle="Respond to artisan account updates, customer booking questions, and use the three-dots menu to edit or resolve tickets."
             badge={`${filtered.length} Showing`}
+            selectedCount={selectedIds.length}
+            bulkActions={
+              <>
+                <CtaButton
+                  variant="secondary"
+                  size="xs"
+                  onClick={() => {
+                    setItems((prev) =>
+                      prev.map((i) =>
+                        selectedIds.includes(i.id)
+                          ? { ...i, status: "completed" }
+                          : i
+                      )
+                    );
+                    notifySaved(`Resolved ${selectedIds.length} ticket(s)`);
+                    setSelectedIds([]);
+                  }}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 text-accent-success" />
+                  <span>Resolve Selected</span>
+                </CtaButton>
+                <CtaButton
+                  variant="secondary"
+                  size="xs"
+                  className="text-accent-error hover:border-accent-error/40 hover:text-accent-error"
+                  onClick={() => {
+                    const toDelete = selectedIds.length;
+                    setItems((prev) =>
+                      prev.filter((i) => !selectedIds.includes(i.id))
+                    );
+                    notifySaved(`Removed ${toDelete} ticket record(s)`);
+                    setSelectedIds([]);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Remove Selected</span>
+                </CtaButton>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds([])}
+                  className="text-xs font-bold text-ink-secondary hover:text-brand-900 transition-colors px-1"
+                >
+                  Clear
+                </button>
+              </>
+            }
             headerAction={
               <CtaButton
                 variant="primary"
@@ -484,6 +532,34 @@ export default function AdminSupportPage() {
               <AdminTable>
                 <AdminTableHeader>
                   <AdminTableRow>
+                    <AdminTableHead className="w-10">
+                      <AdminCheckbox
+                        aria-label="Select all support tickets"
+                        checked={
+                          filtered.length > 0 &&
+                          filtered.every((t) => selectedIds.includes(t.id))
+                        }
+                        indeterminate={
+                          filtered.some((t) => selectedIds.includes(t.id)) &&
+                          !filtered.every((t) => selectedIds.includes(t.id))
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds((prev) => [
+                              ...prev,
+                              ...filtered
+                                .filter((t) => !prev.includes(t.id))
+                                .map((t) => t.id),
+                            ]);
+                          } else {
+                            const filteredIds = new Set(filtered.map((t) => t.id));
+                            setSelectedIds((prev) =>
+                              prev.filter((id) => !filteredIds.has(id))
+                            );
+                          }
+                        }}
+                      />
+                    </AdminTableHead>
                     <AdminTableHead>Ticket Code</AdminTableHead>
                     <AdminTableHead>Requester</AdminTableHead>
                     <AdminTableHead>Subject</AdminTableHead>
@@ -496,7 +572,24 @@ export default function AdminSupportPage() {
                 </AdminTableHeader>
                 <AdminTableBody>
                   {filtered.map((tkt) => (
-                    <AdminTableRow key={tkt.id}>
+                    <AdminTableRow
+                      key={tkt.id}
+                      isSelected={selectedIds.includes(tkt.id)}
+                    >
+                      <AdminTableCell className="w-10">
+                        <AdminCheckbox
+                          aria-label={`Select ticket ${tkt.ticketCode}`}
+                          checked={selectedIds.includes(tkt.id)}
+                          onChange={() => {
+                            setSelectedIds((prev) =>
+                              prev.includes(tkt.id)
+                                ? prev.filter((id) => id !== tkt.id)
+                                : [...prev, tkt.id]
+                            );
+                          }}
+                        />
+                      </AdminTableCell>
+
                       <AdminTableCell className="whitespace-nowrap">
                         <div className="font-mono text-xs font-extrabold text-brand-700">
                           {tkt.ticketCode}

@@ -20,6 +20,7 @@ import {
 import { useRouter } from "next/navigation";
 import { AdminActionMenu } from "@/components/admin/ui/admin-action-menu";
 import {
+  AdminCheckbox,
   AdminDataTable,
   AdminEmptyState,
   AdminTable,
@@ -192,6 +193,7 @@ export function ArtisansKycWorkspace({
   const [admins, setAdmins] = React.useState<AdminRecord[]>(INITIAL_ADMINS);
   const [filter, setFilter] = React.useState<UserViewFilter>("artisans_all");
   const [search, setSearch] = React.useState("");
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
   const [busyId, setBusyId] = React.useState<string | null>(null);
 
   // Inline Form State (replaces modal)
@@ -997,6 +999,34 @@ export function ArtisansKycWorkspace({
               title="Customer Accounts Directory"
               subtitle="Manage registered customers, monitor booking activity, and use the three-dots menu to edit or update standing."
               badge={`${filteredCustomers.length} Customers`}
+              selectedCount={selectedIds.length}
+              bulkActions={
+                <>
+                  <CtaButton
+                    variant="secondary"
+                    size="xs"
+                    className="text-accent-error hover:border-accent-error/40 hover:text-accent-error"
+                    onClick={() => {
+                      const count = selectedIds.length;
+                      setCustomers((prev) =>
+                        prev.filter((c) => !selectedIds.includes(c.id))
+                      );
+                      notifySaved(`Removed ${count} customer record(s)`);
+                      setSelectedIds([]);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Remove Selected</span>
+                  </CtaButton>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds([])}
+                    className="text-xs font-bold text-ink-secondary hover:text-brand-900 transition-colors px-1"
+                  >
+                    Clear
+                  </button>
+                </>
+              }
               headerAction={
                 <CtaButton
                   variant="primary"
@@ -1021,8 +1051,35 @@ export function ArtisansKycWorkspace({
                 <AdminTable>
                   <AdminTableHeader>
                     <AdminTableRow>
+                      <AdminTableHead className="w-10">
+                        <AdminCheckbox
+                          aria-label="Select all customers"
+                          checked={
+                            filteredCustomers.length > 0 &&
+                            filteredCustomers.every((c) => selectedIds.includes(c.id))
+                          }
+                          indeterminate={
+                            filteredCustomers.some((c) => selectedIds.includes(c.id)) &&
+                            !filteredCustomers.every((c) => selectedIds.includes(c.id))
+                          }
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedIds((prev) => [
+                                ...prev,
+                                ...filteredCustomers
+                                  .filter((c) => !prev.includes(c.id))
+                                  .map((c) => c.id),
+                              ]);
+                            } else {
+                              const fIds = new Set(filteredCustomers.map((c) => c.id));
+                              setSelectedIds((prev) =>
+                                prev.filter((id) => !fIds.has(id))
+                              );
+                            }
+                          }}
+                        />
+                      </AdminTableHead>
                       <AdminTableHead>Customer</AdminTableHead>
-                      <AdminTableHead>Contact Details</AdminTableHead>
                       <AdminTableHead>Location</AdminTableHead>
                       <AdminTableHead>Bookings</AdminTableHead>
                       <AdminTableHead>Status</AdminTableHead>
@@ -1033,21 +1090,29 @@ export function ArtisansKycWorkspace({
                   </AdminTableHeader>
                   <AdminTableBody>
                     {filteredCustomers.map((cust) => (
-                      <AdminTableRow key={cust.id}>
+                      <AdminTableRow
+                        key={cust.id}
+                        isSelected={selectedIds.includes(cust.id)}
+                      >
+                        <AdminTableCell className="w-10">
+                          <AdminCheckbox
+                            aria-label={`Select customer ${cust.name}`}
+                            checked={selectedIds.includes(cust.id)}
+                            onChange={() => {
+                              setSelectedIds((prev) =>
+                                prev.includes(cust.id)
+                                  ? prev.filter((id) => id !== cust.id)
+                                  : [...prev, cust.id]
+                              );
+                            }}
+                          />
+                        </AdminTableCell>
                         <AdminTableCell className="whitespace-nowrap">
                           <div className="font-display text-xs sm:text-sm font-extrabold text-brand-950">
                             {cust.name}
                           </div>
-                          <div className="text-[10px] font-semibold text-ink-muted">
-                            Joined {cust.joinedAt}
-                          </div>
-                        </AdminTableCell>
-                        <AdminTableCell className="whitespace-nowrap">
-                          <div className="text-xs font-bold text-brand-800">
-                            {cust.email}
-                          </div>
-                          <div className="text-[11px] font-semibold text-ink-secondary">
-                            {cust.phone}
+                          <div className="text-[11px] font-semibold text-brand-700">
+                            {cust.email} · {cust.phone}
                           </div>
                         </AdminTableCell>
                         <AdminTableCell className="font-display text-xs font-bold text-brand-950 whitespace-nowrap">
@@ -1115,6 +1180,34 @@ export function ArtisansKycWorkspace({
               title="Administrator Roles & Access Control"
               subtitle="Manage internal admin team members responsible for user verification, dispatch, disputes, and support."
               badge={`${filteredAdmins.length} Admins`}
+              selectedCount={selectedIds.length}
+              bulkActions={
+                <>
+                  <CtaButton
+                    variant="secondary"
+                    size="xs"
+                    className="text-accent-error hover:border-accent-error/40 hover:text-accent-error"
+                    onClick={() => {
+                      const count = selectedIds.length;
+                      setAdmins((prev) =>
+                        prev.filter((a) => !selectedIds.includes(a.id))
+                      );
+                      notifySaved(`Removed ${count} admin account(s)`);
+                      setSelectedIds([]);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Remove Selected</span>
+                  </CtaButton>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds([])}
+                    className="text-xs font-bold text-ink-secondary hover:text-brand-900 transition-colors px-1"
+                  >
+                    Clear
+                  </button>
+                </>
+              }
               headerAction={
                 <CtaButton
                   variant="primary"
@@ -1139,9 +1232,36 @@ export function ArtisansKycWorkspace({
                 <AdminTable>
                   <AdminTableHeader>
                     <AdminTableRow>
+                      <AdminTableHead className="w-10">
+                        <AdminCheckbox
+                          aria-label="Select all administrators"
+                          checked={
+                            filteredAdmins.length > 0 &&
+                            filteredAdmins.every((a) => selectedIds.includes(a.id))
+                          }
+                          indeterminate={
+                            filteredAdmins.some((a) => selectedIds.includes(a.id)) &&
+                            !filteredAdmins.every((a) => selectedIds.includes(a.id))
+                          }
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedIds((prev) => [
+                                ...prev,
+                                ...filteredAdmins
+                                  .filter((a) => !prev.includes(a.id))
+                                  .map((a) => a.id),
+                              ]);
+                            } else {
+                              const fIds = new Set(filteredAdmins.map((a) => a.id));
+                              setSelectedIds((prev) =>
+                                prev.filter((id) => !fIds.has(id))
+                              );
+                            }
+                          }}
+                        />
+                      </AdminTableHead>
                       <AdminTableHead>Administrator</AdminTableHead>
                       <AdminTableHead>Assigned Role</AdminTableHead>
-                      <AdminTableHead>Management Scope</AdminTableHead>
                       <AdminTableHead>Last Activity</AdminTableHead>
                       <AdminTableHead>Status</AdminTableHead>
                       <AdminTableHead className="text-right">
@@ -1151,7 +1271,23 @@ export function ArtisansKycWorkspace({
                   </AdminTableHeader>
                   <AdminTableBody>
                     {filteredAdmins.map((adm) => (
-                      <AdminTableRow key={adm.id}>
+                      <AdminTableRow
+                        key={adm.id}
+                        isSelected={selectedIds.includes(adm.id)}
+                      >
+                        <AdminTableCell className="w-10">
+                          <AdminCheckbox
+                            aria-label={`Select administrator ${adm.name}`}
+                            checked={selectedIds.includes(adm.id)}
+                            onChange={() => {
+                              setSelectedIds((prev) =>
+                                prev.includes(adm.id)
+                                  ? prev.filter((id) => id !== adm.id)
+                                  : [...prev, adm.id]
+                              );
+                            }}
+                          />
+                        </AdminTableCell>
                         <AdminTableCell className="whitespace-nowrap">
                           <div className="font-display text-xs sm:text-sm font-extrabold text-brand-950">
                             {adm.name}
@@ -1168,11 +1304,6 @@ export function ArtisansKycWorkspace({
                           >
                             {adm.roleTitle}
                           </PillBadge>
-                        </AdminTableCell>
-                        <AdminTableCell className="max-w-[300px]">
-                          <p className="truncate text-xs font-medium text-ink-secondary">
-                            {adm.permissions}
-                          </p>
                         </AdminTableCell>
                         <AdminTableCell className="text-xs font-bold text-brand-700 whitespace-nowrap">
                           {adm.lastActive}
@@ -1226,6 +1357,52 @@ export function ArtisansKycWorkspace({
               title="Artisan Verification & Profile Directory"
               subtitle="Review artisan trade credentials, verify identity records, and use the three-dots menu to edit or approve bank payout accounts."
               badge={`${filteredArtisans.length} Showing`}
+              selectedCount={selectedIds.length}
+              bulkActions={
+                <>
+                  <CtaButton
+                    variant="secondary"
+                    size="xs"
+                    onClick={() => {
+                      setItems((prev) =>
+                        prev.map((a) =>
+                          selectedIds.includes(a.id)
+                            ? { ...a, kycStatus: "verified" }
+                            : a
+                        )
+                      );
+                      notifySaved(`Verified KYC for ${selectedIds.length} artisan(s)`);
+                      setSelectedIds([]);
+                    }}
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5 text-accent-success" />
+                    <span>Verify Selected</span>
+                  </CtaButton>
+                  <CtaButton
+                    variant="secondary"
+                    size="xs"
+                    className="text-accent-error hover:border-accent-error/40 hover:text-accent-error"
+                    onClick={() => {
+                      const count = selectedIds.length;
+                      setItems((prev) =>
+                        prev.filter((a) => !selectedIds.includes(a.id))
+                      );
+                      notifySaved(`Removed ${count} artisan profile(s)`);
+                      setSelectedIds([]);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Remove Selected</span>
+                  </CtaButton>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds([])}
+                    className="text-xs font-bold text-ink-secondary hover:text-brand-900 transition-colors px-1"
+                  >
+                    Clear
+                  </button>
+                </>
+              }
               headerAction={
                 <CtaButton
                   variant="primary"
@@ -1262,11 +1439,36 @@ export function ArtisansKycWorkspace({
                 <AdminTable>
                   <AdminTableHeader>
                     <AdminTableRow>
+                      <AdminTableHead className="w-10">
+                        <AdminCheckbox
+                          aria-label="Select all artisans"
+                          checked={
+                            filteredArtisans.length > 0 &&
+                            filteredArtisans.every((a) => selectedIds.includes(a.id))
+                          }
+                          indeterminate={
+                            filteredArtisans.some((a) => selectedIds.includes(a.id)) &&
+                            !filteredArtisans.every((a) => selectedIds.includes(a.id))
+                          }
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedIds((prev) => [
+                                ...prev,
+                                ...filteredArtisans
+                                  .filter((a) => !prev.includes(a.id))
+                                  .map((a) => a.id),
+                              ]);
+                            } else {
+                              const fIds = new Set(filteredArtisans.map((a) => a.id));
+                              setSelectedIds((prev) =>
+                                prev.filter((id) => !fIds.has(id))
+                              );
+                            }
+                          }}
+                        />
+                      </AdminTableHead>
                       <AdminTableHead>Artisan Pro</AdminTableHead>
                       <AdminTableHead>Trade &amp; Rate</AdminTableHead>
-                      <AdminTableHead>
-                        Identity &amp; Bank Payout Details
-                      </AdminTableHead>
                       <AdminTableHead>Rating &amp; Jobs</AdminTableHead>
                       <AdminTableHead>KYC Status</AdminTableHead>
                       <AdminTableHead className="text-right">
@@ -1276,7 +1478,24 @@ export function ArtisansKycWorkspace({
                   </AdminTableHeader>
                   <AdminTableBody>
                     {filteredArtisans.map((art) => (
-                      <AdminTableRow key={art.id}>
+                      <AdminTableRow
+                        key={art.id}
+                        isSelected={selectedIds.includes(art.id)}
+                      >
+                        <AdminTableCell className="w-10">
+                          <AdminCheckbox
+                            aria-label={`Select artisan ${art.name}`}
+                            checked={selectedIds.includes(art.id)}
+                            onChange={() => {
+                              setSelectedIds((prev) =>
+                                prev.includes(art.id)
+                                  ? prev.filter((id) => id !== art.id)
+                                  : [...prev, art.id]
+                              );
+                            }}
+                          />
+                        </AdminTableCell>
+
                         <AdminTableCell>
                           <div className="flex items-center gap-2.5">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1312,19 +1531,6 @@ export function ArtisansKycWorkspace({
                           >
                             {art.hourlyRate}/hr
                           </PillBadge>
-                        </AdminTableCell>
-
-                        <AdminTableCell>
-                          <div className="font-mono text-[11px] font-bold text-brand-800 whitespace-nowrap">
-                            NIN: {art.ninNumber || "48192038471"}
-                          </div>
-                          <div className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-ink-secondary whitespace-nowrap">
-                            <Landmark className="h-3 w-3 text-brand-600 shrink-0" />
-                            <span>
-                              {art.bankName || "Access Bank"} ·{" "}
-                              {art.bankAccountNumber || "0148291042"}
-                            </span>
-                          </div>
                         </AdminTableCell>
 
                         <AdminTableCell>

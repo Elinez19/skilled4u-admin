@@ -8,6 +8,8 @@ export interface AdminDataTableProps {
   subtitle?: string;
   badge?: string;
   headerAction?: React.ReactNode;
+  bulkActions?: React.ReactNode;
+  selectedCount?: number;
   children: React.ReactNode;
   className?: string;
 }
@@ -20,6 +22,8 @@ export function AdminDataTable({
   subtitle,
   badge,
   headerAction,
+  bulkActions,
+  selectedCount = 0,
   children,
   className,
 }: AdminDataTableProps) {
@@ -47,6 +51,20 @@ export function AdminDataTable({
             )}
           </div>
           {headerAction && <div className="shrink-0">{headerAction}</div>}
+        </div>
+      )}
+
+      {selectedCount > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-brand-200/90 bg-brand-50/80 px-4 sm:px-5 py-2.5 transition-all">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-2 w-2 rounded-full bg-brand-600 animate-pulse" />
+            <span className="font-display text-xs font-extrabold text-brand-950">
+              {selectedCount} item{selectedCount > 1 ? "s" : ""} selected
+            </span>
+          </div>
+          {bulkActions && (
+            <div className="flex flex-wrap items-center gap-2">{bulkActions}</div>
+          )}
         </div>
       )}
 
@@ -97,20 +115,68 @@ export function AdminTableBody({
   );
 }
 
+export interface AdminTableRowProps
+  extends React.HTMLAttributes<HTMLTableRowElement> {
+  isSelected?: boolean;
+}
+
 export function AdminTableRow({
   className,
+  isSelected,
   ...props
-}: React.HTMLAttributes<HTMLTableRowElement>) {
+}: AdminTableRowProps) {
   return (
     <tr
       className={cn(
         "transition-colors hover:bg-surface-pearl/90",
+        isSelected && "bg-brand-50/70 hover:bg-brand-50/90",
         className
       )}
       {...props}
     />
   );
 }
+
+export interface AdminCheckboxProps
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> {
+  indeterminate?: boolean;
+}
+
+export const AdminCheckbox = React.forwardRef<
+  HTMLInputElement,
+  AdminCheckboxProps
+>(({ className, indeterminate, checked, ...props }, ref) => {
+  const internalRef = React.useRef<HTMLInputElement | null>(null);
+
+  React.useEffect(() => {
+    const el = internalRef.current;
+    if (el) {
+      el.indeterminate = Boolean(indeterminate);
+    }
+  }, [indeterminate]);
+
+  return (
+    <input
+      type="checkbox"
+      ref={(node) => {
+        internalRef.current = node;
+        if (typeof ref === "function") {
+          ref(node);
+        } else if (ref) {
+          (ref as React.MutableRefObject<HTMLInputElement | null>).current =
+            node;
+        }
+      }}
+      checked={checked}
+      className={cn(
+        "h-4 w-4 rounded border-brand-300 text-brand-600 accent-brand-600 focus:ring-2 focus:ring-brand-500/30 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
+        className
+      )}
+      {...props}
+    />
+  );
+});
+AdminCheckbox.displayName = "AdminCheckbox";
 
 export function AdminTableHead({
   className,

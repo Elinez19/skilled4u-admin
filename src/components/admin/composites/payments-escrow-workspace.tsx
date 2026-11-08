@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import {
+  CheckCircle2,
   Clock,
   CreditCard,
   Lock,
@@ -16,6 +17,7 @@ import {
 import { useRouter } from "next/navigation";
 import { AdminActionMenu } from "@/components/admin/ui/admin-action-menu";
 import {
+  AdminCheckbox,
   AdminDataTable,
   AdminEmptyState,
   AdminTable,
@@ -76,6 +78,7 @@ export function PaymentsEscrowWorkspace({
   const [items, setItems] = React.useState<PaymentRow[]>(initialPayments);
   const [filter, setFilter] = React.useState<EscrowFilter>("all");
   const [search, setSearch] = React.useState("");
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
   const [releasingId, setReleasingId] = React.useState<string | null>(null);
 
   // Inline Form State (replaces modal)
@@ -528,12 +531,58 @@ export function PaymentsEscrowWorkspace({
           />
         </div>
 
-        {/* Payments Ledger Table with Three-Dots Action Button & Dropdown CTAs */}
+        {/* Payments Ledger Table with Checkboxes & Essential Columns */}
         <div className="mt-4">
           <AdminDataTable
             title="Escrow & Payout Settlement Ledger"
             subtitle="Track customer booking deposits, platform commissions, and use the three-dots menu to edit or release artisan payouts."
             badge={`${filtered.length} Showing`}
+            selectedCount={selectedIds.length}
+            bulkActions={
+              <>
+                <CtaButton
+                  variant="secondary"
+                  size="xs"
+                  onClick={() => {
+                    setItems((prev) =>
+                      prev.map((p) =>
+                        selectedIds.includes(p.id)
+                          ? { ...p, escrowStatus: "released", status: "settled" }
+                          : p
+                      )
+                    );
+                    notifySaved(`Released escrow for ${selectedIds.length} transaction(s)`);
+                    setSelectedIds([]);
+                  }}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 text-accent-success" />
+                  <span>Release Selected</span>
+                </CtaButton>
+                <CtaButton
+                  variant="secondary"
+                  size="xs"
+                  className="text-accent-error hover:border-accent-error/40 hover:text-accent-error"
+                  onClick={() => {
+                    const toDelete = selectedIds.length;
+                    setItems((prev) =>
+                      prev.filter((p) => !selectedIds.includes(p.id))
+                    );
+                    notifySaved(`Removed ${toDelete} payment record(s)`);
+                    setSelectedIds([]);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Remove Selected</span>
+                </CtaButton>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds([])}
+                  className="text-xs font-bold text-ink-secondary hover:text-brand-900 transition-colors px-1"
+                >
+                  Clear
+                </button>
+              </>
+            }
             headerAction={
               <CtaButton
                 variant="primary"
@@ -571,12 +620,37 @@ export function PaymentsEscrowWorkspace({
               <AdminTable>
                 <AdminTableHeader>
                   <AdminTableRow>
+                    <AdminTableHead className="w-10">
+                      <AdminCheckbox
+                        aria-label="Select all transactions"
+                        checked={
+                          filtered.length > 0 &&
+                          filtered.every((p) => selectedIds.includes(p.id))
+                        }
+                        indeterminate={
+                          filtered.some((p) => selectedIds.includes(p.id)) &&
+                          !filtered.every((p) => selectedIds.includes(p.id))
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds((prev) => [
+                              ...prev,
+                              ...filtered
+                                .filter((p) => !prev.includes(p.id))
+                                .map((p) => p.id),
+                            ]);
+                          } else {
+                            const filteredIds = new Set(filtered.map((p) => p.id));
+                            setSelectedIds((prev) =>
+                              prev.filter((id) => !filteredIds.has(id))
+                            );
+                          }
+                        }}
+                      />
+                    </AdminTableHead>
                     <AdminTableHead>Transaction Reference</AdminTableHead>
-                    <AdminTableHead>Client</AdminTableHead>
-                    <AdminTableHead>Artisan Beneficiary</AdminTableHead>
+                    <AdminTableHead>Client &amp; Beneficiary</AdminTableHead>
                     <AdminTableHead>Gross Amount</AdminTableHead>
-                    <AdminTableHead>Split (90% / 10%)</AdminTableHead>
-                    <AdminTableHead>Channel</AdminTableHead>
                     <AdminTableHead>Escrow State</AdminTableHead>
                     <AdminTableHead className="text-right">
                       Actions
@@ -585,49 +659,57 @@ export function PaymentsEscrowWorkspace({
                 </AdminTableHeader>
                 <AdminTableBody>
                   {filtered.map((pay) => (
-                    <AdminTableRow key={pay.id}>
+                    <AdminTableRow
+                      key={pay.id}
+                      isSelected={selectedIds.includes(pay.id)}
+                    >
+                      <AdminTableCell className="w-10">
+                        <AdminCheckbox
+                          aria-label={`Select transaction ${pay.reference}`}
+                          checked={selectedIds.includes(pay.id)}
+                          onChange={() => {
+                            setSelectedIds((prev) =>
+                              prev.includes(pay.id)
+                                ? prev.filter((id) => id !== pay.id)
+                                : [...prev, pay.id]
+                            );
+                          }}
+                        />
+                      </AdminTableCell>
+
                       <AdminTableCell className="whitespace-nowrap">
                         <div className="font-mono text-[11px] font-extrabold text-brand-700">
                           {pay.reference}
                         </div>
-                        <div className="font-mono text-[10px] font-semibold text-ink-muted">
-                          {pay.bachsTransactionId || "pending_confirmation"}
+                        <div className="mt-0.5 inline-flex items-center gap-1">
+                          <PillBadge
+                            tone="sky"
+                            className="px-1.5 py-0.2 text-[9px] uppercase font-bold"
+                          >
+                            {pay.paymentMethod.replace("_", " ")}
+                          </PillBadge>
+                          <span className="font-mono text-[10px] text-ink-muted">
+                            {pay.bachsTransactionId ? `· ${pay.bachsTransactionId}` : ""}
+                          </span>
                         </div>
-                      </AdminTableCell>
-
-                      <AdminTableCell>
-                        <div className="font-display text-xs font-extrabold text-brand-950 whitespace-nowrap">
-                          {pay.clientName}
-                        </div>
-                        <div className="text-[11px] font-semibold text-ink-secondary truncate max-w-[160px]">
-                          {pay.clientEmail}
-                        </div>
-                      </AdminTableCell>
-
-                      <AdminTableCell className="font-display text-xs font-extrabold text-brand-950 whitespace-nowrap">
-                        {pay.artisanName}
-                      </AdminTableCell>
-
-                      <AdminTableCell className="font-display text-xs sm:text-sm font-extrabold text-brand-950 whitespace-nowrap">
-                        {formatCurrency(pay.amount, pay.currency)}
                       </AdminTableCell>
 
                       <AdminTableCell className="whitespace-nowrap">
-                        <div className="font-display text-[11px] font-extrabold text-brand-600">
-                          Pro: {formatCurrency(pay.artisanPayout, pay.currency)}
+                        <div className="font-display text-xs font-extrabold text-brand-950">
+                          {pay.clientName}
                         </div>
-                        <div className="text-[10px] font-semibold text-ink-secondary">
-                          Fee: {formatCurrency(pay.platformFee, pay.currency)}
+                        <div className="text-[11px] font-semibold text-brand-600">
+                          Pro: {pay.artisanName}
                         </div>
                       </AdminTableCell>
 
-                      <AdminTableCell>
-                        <PillBadge
-                          tone="sky"
-                          className="px-2.5 py-0.5 text-[10px] uppercase whitespace-nowrap"
-                        >
-                          {pay.paymentMethod.replace("_", " ")}
-                        </PillBadge>
+                      <AdminTableCell className="whitespace-nowrap">
+                        <div className="font-display text-xs sm:text-sm font-extrabold text-brand-950">
+                          {formatCurrency(pay.amount, pay.currency)}
+                        </div>
+                        <div className="text-[10px] font-semibold text-ink-muted">
+                          Pro 90%: {formatCurrency(pay.artisanPayout, pay.currency)}
+                        </div>
                       </AdminTableCell>
 
                       <AdminTableCell>

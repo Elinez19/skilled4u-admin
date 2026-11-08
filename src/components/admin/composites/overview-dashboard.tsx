@@ -12,6 +12,7 @@ import {
   Play,
   Scale,
   ShieldAlert,
+  Trash2,
   TrendingUp,
   Users,
   Wrench,
@@ -20,6 +21,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { AdminActionMenu } from "@/components/admin/ui/admin-action-menu";
 import {
+  AdminCheckbox,
   AdminDataTable,
   AdminEmptyState,
   AdminTable,
@@ -83,6 +85,7 @@ export function OverviewDashboard({
   categories,
 }: OverviewDashboardProps) {
   const [bookings, setBookings] = React.useState<BookingRow[]>(initialBookings);
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
   async function updateBookingStatus(id: string, status: string) {
     setBookings((prev) =>
@@ -233,6 +236,48 @@ export function OverviewDashboard({
               title="Recent Service Bookings"
               subtitle="Live bookings dispatched from the skilled4U mobile app."
               badge={`${bookings.length} Total`}
+              selectedCount={selectedIds.length}
+              bulkActions={
+                <>
+                  <CtaButton
+                    variant="secondary"
+                    size="xs"
+                    onClick={() => {
+                      setBookings((prev) =>
+                        prev.map((b) =>
+                          selectedIds.includes(b.id)
+                            ? { ...b, status: "completed" }
+                            : b
+                        )
+                      );
+                      setSelectedIds([]);
+                    }}
+                  >
+                    <span>Mark Completed</span>
+                  </CtaButton>
+                  <CtaButton
+                    variant="secondary"
+                    size="xs"
+                    className="text-accent-error hover:border-accent-error/40 hover:text-accent-error"
+                    onClick={() => {
+                      setBookings((prev) =>
+                        prev.filter((b) => !selectedIds.includes(b.id))
+                      );
+                      setSelectedIds([]);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Remove Selected</span>
+                  </CtaButton>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds([])}
+                    className="text-xs font-bold text-ink-secondary hover:text-brand-900 transition-colors px-1"
+                  >
+                    Clear
+                  </button>
+                </>
+              }
               headerAction={
                 <CtaButton
                   variant="secondary"
@@ -263,6 +308,41 @@ export function OverviewDashboard({
                 <AdminTable>
                   <AdminTableHeader>
                     <AdminTableRow>
+                      <AdminTableHead className="w-10">
+                        <AdminCheckbox
+                          aria-label="Select all bookings"
+                          checked={
+                            bookings.slice(0, 6).length > 0 &&
+                            bookings
+                              .slice(0, 6)
+                              .every((b) => selectedIds.includes(b.id))
+                          }
+                          indeterminate={
+                            bookings
+                              .slice(0, 6)
+                              .some((b) => selectedIds.includes(b.id)) &&
+                            !bookings
+                              .slice(0, 6)
+                              .every((b) => selectedIds.includes(b.id))
+                          }
+                          onChange={(e) => {
+                            const visible = bookings.slice(0, 6);
+                            if (e.target.checked) {
+                              setSelectedIds((prev) => [
+                                ...prev,
+                                ...visible
+                                  .filter((b) => !prev.includes(b.id))
+                                  .map((b) => b.id),
+                              ]);
+                            } else {
+                              const fIds = new Set(visible.map((b) => b.id));
+                              setSelectedIds((prev) =>
+                                prev.filter((id) => !fIds.has(id))
+                              );
+                            }
+                          }}
+                        />
+                      </AdminTableHead>
                       <AdminTableHead>Booking Code</AdminTableHead>
                       <AdminTableHead>Client &amp; Service</AdminTableHead>
                       <AdminTableHead>Artisan Pro</AdminTableHead>
@@ -275,7 +355,23 @@ export function OverviewDashboard({
                   </AdminTableHeader>
                   <AdminTableBody>
                     {bookings.slice(0, 6).map((bk) => (
-                      <AdminTableRow key={bk.id}>
+                      <AdminTableRow
+                        key={bk.id}
+                        isSelected={selectedIds.includes(bk.id)}
+                      >
+                        <AdminTableCell className="w-10">
+                          <AdminCheckbox
+                            aria-label={`Select booking ${bk.bookingCode}`}
+                            checked={selectedIds.includes(bk.id)}
+                            onChange={() => {
+                              setSelectedIds((prev) =>
+                                prev.includes(bk.id)
+                                  ? prev.filter((id) => id !== bk.id)
+                                  : [...prev, bk.id]
+                              );
+                            }}
+                          />
+                        </AdminTableCell>
                         <AdminTableCell className="font-mono text-[11px] font-extrabold text-brand-700 whitespace-nowrap">
                           {bk.bookingCode}
                         </AdminTableCell>

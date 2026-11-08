@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { AdminActionMenu } from "@/components/admin/ui/admin-action-menu";
 import {
+  AdminCheckbox,
   AdminDataTable,
   AdminEmptyState,
   AdminTable,
@@ -111,6 +112,7 @@ export default function AdminDisputesPage() {
   const [items, setItems] = React.useState<DisputeItem[]>(INITIAL_DISPUTES);
   const [filter, setFilter] = React.useState<DisputeFilter>("all");
   const [search, setSearch] = React.useState("");
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
   // Inline Form State
   const [formOpen, setFormOpen] = React.useState(true);
@@ -438,12 +440,58 @@ export default function AdminDisputesPage() {
           />
         </div>
 
-        {/* Disputes Table with Three-Dots Action Button & Dropdown CTAs */}
+        {/* Disputes Table with Checkboxes, Bulk Actions & Three-Dots Menu */}
         <div className="mt-4">
           <AdminDataTable
             title="Marketplace Dispute & Arbitration Queue"
             subtitle="Review customer and artisan reports, mediate service quality claims, and use the three-dots menu to edit or settle."
             badge={`${filtered.length} Showing`}
+            selectedCount={selectedIds.length}
+            bulkActions={
+              <>
+                <CtaButton
+                  variant="secondary"
+                  size="xs"
+                  onClick={() => {
+                    setItems((prev) =>
+                      prev.map((i) =>
+                        selectedIds.includes(i.id)
+                          ? { ...i, status: "resolved" }
+                          : i
+                      )
+                    );
+                    notifySaved(`Resolved ${selectedIds.length} dispute(s)`);
+                    setSelectedIds([]);
+                  }}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 text-accent-success" />
+                  <span>Resolve Selected</span>
+                </CtaButton>
+                <CtaButton
+                  variant="secondary"
+                  size="xs"
+                  className="text-accent-error hover:border-accent-error/40 hover:text-accent-error"
+                  onClick={() => {
+                    const toDelete = selectedIds.length;
+                    setItems((prev) =>
+                      prev.filter((i) => !selectedIds.includes(i.id))
+                    );
+                    notifySaved(`Removed ${toDelete} dispute record(s)`);
+                    setSelectedIds([]);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Remove Selected</span>
+                </CtaButton>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds([])}
+                  className="text-xs font-bold text-ink-secondary hover:text-brand-900 transition-colors px-1"
+                >
+                  Clear
+                </button>
+              </>
+            }
             headerAction={
               <CtaButton
                 variant="primary"
@@ -468,9 +516,37 @@ export default function AdminDisputesPage() {
               <AdminTable>
                 <AdminTableHeader>
                   <AdminTableRow>
+                    <AdminTableHead className="w-10">
+                      <AdminCheckbox
+                        aria-label="Select all disputes"
+                        checked={
+                          filtered.length > 0 &&
+                          filtered.every((i) => selectedIds.includes(i.id))
+                        }
+                        indeterminate={
+                          filtered.some((i) => selectedIds.includes(i.id)) &&
+                          !filtered.every((i) => selectedIds.includes(i.id))
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds((prev) => [
+                              ...prev,
+                              ...filtered
+                                .filter((i) => !prev.includes(i.id))
+                                .map((i) => i.id),
+                            ]);
+                          } else {
+                            const filteredIds = new Set(filtered.map((i) => i.id));
+                            setSelectedIds((prev) =>
+                              prev.filter((id) => !filteredIds.has(id))
+                            );
+                          }
+                        }}
+                      />
+                    </AdminTableHead>
                     <AdminTableHead>Case &amp; Booking</AdminTableHead>
                     <AdminTableHead>Client &amp; Artisan</AdminTableHead>
-                    <AdminTableHead>Service &amp; Claim Reason</AdminTableHead>
+                    <AdminTableHead>Service</AdminTableHead>
                     <AdminTableHead>Frozen Escrow</AdminTableHead>
                     <AdminTableHead>Status</AdminTableHead>
                     <AdminTableHead className="text-right">
@@ -480,7 +556,24 @@ export default function AdminDisputesPage() {
                 </AdminTableHeader>
                 <AdminTableBody>
                   {filtered.map((item) => (
-                    <AdminTableRow key={item.id}>
+                    <AdminTableRow
+                      key={item.id}
+                      isSelected={selectedIds.includes(item.id)}
+                    >
+                      <AdminTableCell className="w-10">
+                        <AdminCheckbox
+                          aria-label={`Select dispute case ${item.caseCode}`}
+                          checked={selectedIds.includes(item.id)}
+                          onChange={() => {
+                            setSelectedIds((prev) =>
+                              prev.includes(item.id)
+                                ? prev.filter((id) => id !== item.id)
+                                : [...prev, item.id]
+                            );
+                          }}
+                        />
+                      </AdminTableCell>
+
                       <AdminTableCell className="whitespace-nowrap">
                         <div className="font-mono text-xs font-extrabold text-brand-700">
                           {item.caseCode}
@@ -499,12 +592,9 @@ export default function AdminDisputesPage() {
                         </div>
                       </AdminTableCell>
 
-                      <AdminTableCell className="max-w-[260px]">
+                      <AdminTableCell className="max-w-[240px]">
                         <div className="truncate font-display text-xs font-extrabold text-brand-950">
                           {item.serviceTitle}
-                        </div>
-                        <div className="truncate text-[11px] font-medium text-ink-secondary">
-                          {item.reason}
                         </div>
                       </AdminTableCell>
 

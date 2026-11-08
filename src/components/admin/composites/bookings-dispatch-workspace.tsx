@@ -19,6 +19,7 @@ import {
 import { useRouter } from "next/navigation";
 import { AdminActionMenu } from "@/components/admin/ui/admin-action-menu";
 import {
+  AdminCheckbox,
   AdminDataTable,
   AdminEmptyState,
   AdminTable,
@@ -82,6 +83,7 @@ export function BookingsDispatchWorkspace({
   const [statusFilter, setStatusFilter] =
     React.useState<BookingStatusFilter>("all");
   const [search, setSearch] = React.useState("");
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
   const [busyId, setBusyId] = React.useState<string | null>(null);
 
   // Inline Form State (replaces modal)
@@ -513,12 +515,58 @@ export function BookingsDispatchWorkspace({
           />
         </div>
 
-        {/* Bookings Data Table with Three-Dots Action Button & Dropdown CTAs */}
+        {/* Bookings Queue Table with Checkboxes & Essential Columns */}
         <div className="mt-4">
           <AdminDataTable
             title="Service Bookings & Dispatch Queue"
             subtitle="Monitor active artisan dispatches, client schedules, and use the three-dots menu to edit or advance job states."
             badge={`${filtered.length} Showing`}
+            selectedCount={selectedIds.length}
+            bulkActions={
+              <>
+                <CtaButton
+                  variant="secondary"
+                  size="xs"
+                  onClick={() => {
+                    setItems((prev) =>
+                      prev.map((b) =>
+                        selectedIds.includes(b.id)
+                          ? { ...b, status: "completed" }
+                          : b
+                      )
+                    );
+                    notifySaved(`Marked ${selectedIds.length} booking(s) as completed`);
+                    setSelectedIds([]);
+                  }}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 text-accent-success" />
+                  <span>Mark Completed</span>
+                </CtaButton>
+                <CtaButton
+                  variant="secondary"
+                  size="xs"
+                  className="text-accent-error hover:border-accent-error/40 hover:text-accent-error"
+                  onClick={() => {
+                    const count = selectedIds.length;
+                    setItems((prev) =>
+                      prev.filter((b) => !selectedIds.includes(b.id))
+                    );
+                    notifySaved(`Removed ${count} booking record(s)`);
+                    setSelectedIds([]);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Remove Selected</span>
+                </CtaButton>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds([])}
+                  className="text-xs font-bold text-ink-secondary hover:text-brand-900 transition-colors px-1"
+                >
+                  Clear
+                </button>
+              </>
+            }
             headerAction={
               <CtaButton
                 variant="primary"
@@ -556,9 +604,37 @@ export function BookingsDispatchWorkspace({
               <AdminTable>
                 <AdminTableHeader>
                   <AdminTableRow>
+                    <AdminTableHead className="w-10">
+                      <AdminCheckbox
+                        aria-label="Select all bookings"
+                        checked={
+                          filtered.length > 0 &&
+                          filtered.every((b) => selectedIds.includes(b.id))
+                        }
+                        indeterminate={
+                          filtered.some((b) => selectedIds.includes(b.id)) &&
+                          !filtered.every((b) => selectedIds.includes(b.id))
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds((prev) => [
+                              ...prev,
+                              ...filtered
+                                .filter((b) => !prev.includes(b.id))
+                                .map((b) => b.id),
+                            ]);
+                          } else {
+                            const fIds = new Set(filtered.map((b) => b.id));
+                            setSelectedIds((prev) =>
+                              prev.filter((id) => !fIds.has(id))
+                            );
+                          }
+                        }}
+                      />
+                    </AdminTableHead>
                     <AdminTableHead>Booking Code</AdminTableHead>
-                    <AdminTableHead>Client &amp; Location</AdminTableHead>
-                    <AdminTableHead>Service &amp; Artisan</AdminTableHead>
+                    <AdminTableHead>Client &amp; Pro</AdminTableHead>
+                    <AdminTableHead>Service</AdminTableHead>
                     <AdminTableHead>Schedule</AdminTableHead>
                     <AdminTableHead>Agreed Price</AdminTableHead>
                     <AdminTableHead>Status</AdminTableHead>
@@ -569,30 +645,40 @@ export function BookingsDispatchWorkspace({
                 </AdminTableHeader>
                 <AdminTableBody>
                   {filtered.map((bk) => (
-                    <AdminTableRow key={bk.id}>
+                    <AdminTableRow
+                      key={bk.id}
+                      isSelected={selectedIds.includes(bk.id)}
+                    >
+                      <AdminTableCell className="w-10">
+                        <AdminCheckbox
+                          aria-label={`Select booking ${bk.bookingCode}`}
+                          checked={selectedIds.includes(bk.id)}
+                          onChange={() => {
+                            setSelectedIds((prev) =>
+                              prev.includes(bk.id)
+                                ? prev.filter((id) => id !== bk.id)
+                                : [...prev, bk.id]
+                            );
+                          }}
+                        />
+                      </AdminTableCell>
+
                       <AdminTableCell className="font-mono text-[11px] font-extrabold text-brand-700 whitespace-nowrap">
                         {bk.bookingCode}
                       </AdminTableCell>
 
-                      <AdminTableCell>
+                      <AdminTableCell className="whitespace-nowrap">
                         <div className="font-display text-xs font-extrabold text-brand-950">
                           {bk.clientName}
                         </div>
-                        <div className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-ink-secondary">
-                          <MapPin className="h-3 w-3 text-brand-600 shrink-0" />
-                          <span className="truncate max-w-[180px]">
-                            {bk.address}
-                          </span>
+                        <div className="text-[11px] font-semibold text-brand-600">
+                          Pro: {bk.artisanName}
                         </div>
                       </AdminTableCell>
 
                       <AdminTableCell>
                         <div className="font-display text-xs font-extrabold text-brand-950 max-w-[200px] truncate">
                           {bk.serviceTitle}
-                        </div>
-                        <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-bold text-brand-600">
-                          <Wrench className="h-2.5 w-2.5 shrink-0" />
-                          <span>Pro: {bk.artisanName}</span>
                         </div>
                       </AdminTableCell>
 
@@ -611,12 +697,6 @@ export function BookingsDispatchWorkspace({
                         <div className="font-display text-xs sm:text-sm font-extrabold text-brand-950">
                           {formatCurrency(bk.agreedAmount)}
                         </div>
-                        <PillBadge
-                          tone="sky"
-                          className="mt-0.5 px-2 py-0.5 text-[9px] uppercase"
-                        >
-                          Escrow: {bk.paymentStatus}
-                        </PillBadge>
                       </AdminTableCell>
 
                       <AdminTableCell>

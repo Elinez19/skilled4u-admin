@@ -66,6 +66,7 @@ export interface AdminTextFieldProps
   label: string;
   hint?: string;
   leadingIcon?: React.ReactNode;
+  trailingIcon?: React.ReactNode;
 }
 
 /**
@@ -74,7 +75,7 @@ export interface AdminTextFieldProps
 export const AdminTextField = React.forwardRef<
   HTMLInputElement,
   AdminTextFieldProps
->(({ label, hint, leadingIcon, className, id, ...props }, ref) => {
+>(({ label, hint, leadingIcon, trailingIcon, className, id, ...props }, ref) => {
   const generatedId = React.useId();
   const inputId = id ?? generatedId;
 
@@ -101,10 +102,16 @@ export const AdminTextField = React.forwardRef<
           className={cn(
             "flex h-10 w-full rounded-xl border-2 border-brand-100 bg-surface-porcelain px-3.5 py-2 font-sans text-xs sm:text-sm font-semibold text-ink-primary shadow-gloss-card transition-all placeholder:text-ink-muted focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-accent-sky/40 disabled:cursor-not-allowed disabled:opacity-60",
             leadingIcon && "pl-10",
+            trailingIcon && "pr-10",
             className
           )}
           {...props}
         />
+        {trailingIcon && (
+          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center">
+            {trailingIcon}
+          </div>
+        )}
       </div>
       {hint && (
         <p className="text-[11px] font-medium text-ink-secondary">{hint}</p>
