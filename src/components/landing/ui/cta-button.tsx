@@ -4,7 +4,7 @@ import * as React from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { motionTokens } from "@/lib/motion";
-import { type CtaVariant } from "@/lib/tokens";
+import { tokens, type CtaVariant } from "@/lib/tokens";
 import { cn } from "@/lib/utils";
 
 export type CtaIconType = "apple" | "play" | "sparkle" | "none";
@@ -47,12 +47,12 @@ function PlayStoreIcon({ className }: { className?: string }) {
       className={cn("h-5 w-5 shrink-0", className)}
       aria-hidden="true"
     >
-      <path d="M4 2.8V21.2L14.2 12L4 2.8Z" fill="#478BFF" />
-      <path d="M4 2.8L17.6 9.2L14.2 12L4 2.8Z" fill="#00C47E" />
-      <path d="M4 21.2L17.6 14.8L14.2 12L4 21.2Z" fill="#FFB800" />
+      <path d="M4 2.8V21.2L14.2 12L4 2.8Z" fill={tokens.colors.brand[400]} />
+      <path d="M4 2.8L17.6 9.2L14.2 12L4 2.8Z" fill={tokens.colors.accent.success} />
+      <path d="M4 21.2L17.6 14.8L14.2 12L4 21.2Z" fill={tokens.colors.accent.gold} />
       <path
         d="M17.6 9.2L20.6 10.7C21.5 11.2 21.5 12.8 20.6 13.3L17.6 14.8L14.2 12L17.6 9.2Z"
-        fill="#5CE1FF"
+        fill={tokens.colors.accent.sky}
       />
     </svg>
   );

@@ -10,7 +10,7 @@ export interface AnimatedTextProps {
   text: string;
   as?: "h1" | "h2" | "h3" | "p" | "span";
   className?: string;
-  highlightWords?: string[];
+  highlightWords?: readonly string[];
   highlightClassName?: string;
   delay?: number;
   stagger?: number;

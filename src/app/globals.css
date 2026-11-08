@@ -52,6 +52,9 @@
   --accent-sky: #5ce1ff;
   --accent-gold: #ffb800;
   --accent-success: #00c47e;
+  --accent-warm: #8d5538;
+  --accent-warm-dark: #6e3d23;
+  --accent-warm-deep: #4e2916;
 
   /* 4. High-Contrast Typography Hierarchy Tokens */
   --ink-primary: #05113d;
@@ -60,7 +63,7 @@
   --ink-on-blue: #ffffff;
   --ink-on-blue-muted: #dce8ff;
 
-  /* 5. Radii Tokens */
+  /* 5. Radii & Layout Tokens */
   --radius-xs: 0.625rem;
   --radius-sm: 0.875rem;
   --radius-md: 1.25rem;
@@ -68,6 +71,7 @@
   --radius-card: 2.25rem;
   --radius-slab: 2.5rem;
   --radius-pill: 9999px;
+  --container-slab: 87.5rem;
 
   /* 6. Glossy Gradients & Specular Recipes */
   --gloss-primary-cta: linear-gradient(
@@ -187,16 +191,20 @@
   --color-accent-sky: var(--accent-sky);
   --color-accent-gold: var(--accent-gold);
   --color-accent-success: var(--accent-success);
+  --color-accent-warm: var(--accent-warm);
+  --color-accent-warm-dark: var(--accent-warm-dark);
+  --color-accent-warm-deep: var(--accent-warm-deep);
   --color-ink-primary: var(--ink-primary);
   --color-ink-secondary: var(--ink-secondary);
   --color-ink-muted: var(--ink-muted);
   --color-ink-on-blue: var(--ink-on-blue);
   --color-ink-on-blue-muted: var(--ink-on-blue-muted);
 
-  /* Skilled4U Radius Tokens */
+  /* Skilled4U Radius & Container Tokens */
   --radius-card: var(--radius-card);
   --radius-slab: var(--radius-slab);
   --radius-pill: var(--radius-pill);
+  --container-slab: var(--container-slab);
 
   /* Skilled4U Shadow Tokens */
   --shadow-cta-primary: var(--shadow-cta-primary);

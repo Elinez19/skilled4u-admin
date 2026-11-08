@@ -38,7 +38,7 @@ export function SectionSlab({
     <div id={id} className={cn("px-3 sm:px-5 lg:px-7 py-3 sm:py-4", className)}>
       <ScaleSlab
         className={cn(
-          "relative mx-auto max-w-[1400px] overflow-hidden",
+          "relative mx-auto max-w-slab overflow-hidden",
           slabToneClasses[tone]
         )}
       >
@@ -61,7 +61,7 @@ export function SectionSlab({
 export interface SectionHeaderProps {
   eyebrow?: React.ReactNode;
   headline: string;
-  highlightWords?: string[];
+  highlightWords?: readonly string[];
   subtitle?: string;
   tone?: "on-blue" | "on-light";
   underlineLastWord?: boolean;

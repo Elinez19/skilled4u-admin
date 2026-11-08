@@ -15,7 +15,7 @@ import { SectionHeader, SectionSlab } from "@/components/landing/ui/section-slab
 import { AnimatedText } from "@/components/motion/animated-text";
 import { Marquee } from "@/components/motion/marquee";
 import { Reveal, ScaleSlab, Stagger, StaggerItem } from "@/components/motion/reveal";
-import { landingContent } from "@/content/landing";
+import { type FaqItemData, landingContent } from "@/content/landing";
 
 /**
  * Section 1: Hero Slab ("Broken Pipe or AC? Fixed in Minutes.")
@@ -27,7 +27,7 @@ export function HeroSection() {
 
   return (
     <div id="top" className="px-3 sm:px-5 lg:px-7 pt-3 pb-4">
-      <ScaleSlab className="surface-slab-blue relative mx-auto max-w-[1400px] overflow-hidden rounded-slab">
+      <ScaleSlab className="surface-slab-blue relative mx-auto max-w-slab overflow-hidden rounded-slab">
         {/* Custom 3D Glossy Porcelain & Cobalt Background Image */}
         <div className="pointer-events-none absolute inset-0 select-none opacity-65">
           <Image
@@ -154,25 +154,39 @@ export function ServicesGridSection() {
 /**
  * Section 9: FAQ Accordion ("Got Questions ?")
  */
-export function FaqSection() {
+export interface FaqSectionProps {
+  headline?: string;
+  subtitle?: string;
+  moreCta?: string;
+  moreHref?: string;
+  items?: readonly FaqItemData[];
+}
+
+export function FaqSection({
+  headline,
+  subtitle,
+  moreCta,
+  moreHref = "/faqs",
+  items,
+}: FaqSectionProps = {}) {
   const { faqs } = landingContent;
 
   return (
     <SectionSlab id="faqs" tone="pearl">
       <SectionHeader
         tone="on-light"
-        headline={faqs.headline}
+        headline={headline ?? faqs.headline}
         highlightWords={["Questions"]}
-        subtitle={faqs.subtitle}
+        subtitle={subtitle ?? faqs.subtitle}
       />
 
       <div className="mt-12">
-        <FaqAccordion items={faqs.items} />
+        <FaqAccordion items={items ?? faqs.items} />
       </div>
 
       <Reveal delay={0.2} className="mt-12 text-center">
-        <CtaButton variant="secondary" size="lg" href="#download">
-          {faqs.moreCta}
+        <CtaButton variant="secondary" size="lg" href={moreHref}>
+          {moreCta ?? faqs.moreCta}
         </CtaButton>
       </Reveal>
     </SectionSlab>

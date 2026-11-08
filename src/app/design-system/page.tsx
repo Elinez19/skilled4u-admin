@@ -4,6 +4,10 @@ import { OffsetRing } from "@/components/brand/offset-ring";
 import { AbujaCoverageMap } from "@/components/landing/composites/abuja-coverage-map";
 import { ArtisanMarqueeCard } from "@/components/landing/composites/artisan-marquee-card";
 import {
+  ArtisanHeroSection,
+  HowItWorksSection,
+} from "@/components/landing/composites/artisan-page-sections";
+import {
   FaqSection,
   HeroSection,
   ServicesGridSection,
@@ -117,6 +121,8 @@ export default function DesignSystemShowcasePage() {
 
       {/* Full Reusable Section Components Preview */}
       <HeroSection />
+      <ArtisanHeroSection />
+      <HowItWorksSection />
       <PhoneShowcaseSection />
       <ServicesGridSection />
       <AbujaCoverageMap />

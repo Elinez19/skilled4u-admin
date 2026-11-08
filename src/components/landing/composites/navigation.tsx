@@ -3,6 +3,8 @@
 import * as React from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Menu, X } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { BrandLogo, GiantWordmark } from "@/components/brand/logo";
 import { OffsetRing } from "@/components/brand/offset-ring";
 import { ToolPattern } from "@/components/brand/tool-pattern";
@@ -84,34 +86,57 @@ export function Preloader() {
  */
 export function LandingNavbar() {
   const { navbar } = landingContent;
+  const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = React.useState(false);
+
+  const isLinkActive = (href: string, idx: number) => {
+    if (pathname?.startsWith("/artisans") || pathname?.startsWith("/vendors")) {
+      return href === "/artisans";
+    }
+    if (pathname?.startsWith("/faqs") || pathname?.startsWith("/faq")) {
+      return href === "/faqs";
+    }
+    if (
+      pathname?.startsWith("/blog") ||
+      pathname?.startsWith("/whats-new") ||
+      pathname?.startsWith("/updates") ||
+      pathname?.startsWith("/the-good-stuff") ||
+      pathname?.startsWith("/more")
+    ) {
+      return href === "/blog";
+    }
+    return idx === 0;
+  };
 
   return (
     <header className="sticky top-0 z-40 px-3 sm:px-5 lg:px-7 pt-3 sm:pt-4">
-      <div className="surface-slab-blue mx-auto max-w-[1400px] rounded-3xl sm:rounded-pill px-5 sm:px-8 py-3.5">
+      <div className="surface-slab-blue mx-auto max-w-slab rounded-3xl sm:rounded-pill px-5 sm:px-8 py-3.5">
         <div className="flex items-center justify-between gap-4">
-          <a href="#top" className="group focus:outline-none">
+          <Link href="/" className="group focus:outline-none">
             <BrandLogo tone="on-blue" />
-          </a>
+          </Link>
 
           {/* Desktop Navigation Links */}
           <nav
             aria-label="Primary"
             className="hidden lg:flex items-center gap-8 font-display text-base font-extrabold"
           >
-            {navbar.links.map((link, idx) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className={
-                  idx === 0
-                    ? "text-accent-gold transition-colors hover:text-ink-on-blue"
-                    : "text-ink-on-blue transition-colors hover:text-accent-sky"
-                }
-              >
-                {link.label}
-              </a>
-            ))}
+            {navbar.links.map((link, idx) => {
+              const active = isLinkActive(link.href, idx);
+              return (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  className={
+                    active
+                      ? "text-accent-gold transition-colors hover:text-ink-on-blue"
+                      : "text-ink-on-blue transition-colors hover:text-accent-sky"
+                  }
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </nav>
 
           {/* Desktop CTA Pair (Strictly our 2 CTA variants) */}
@@ -160,16 +185,23 @@ export function LandingNavbar() {
               className="overflow-hidden sm:hidden"
             >
               <div className="mt-4 flex flex-col gap-3 border-t border-brand-400/30 pt-4 pb-2">
-                {navbar.links.map((link) => (
-                  <a
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setMobileOpen(false)}
-                    className="font-display text-lg font-extrabold text-ink-on-blue py-1"
-                  >
-                    {link.label}
-                  </a>
-                ))}
+                {navbar.links.map((link, idx) => {
+                  const active = isLinkActive(link.href, idx);
+                  return (
+                    <Link
+                      key={link.label}
+                      href={link.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={
+                        active
+                          ? "font-display text-lg font-extrabold text-accent-gold py-1"
+                          : "font-display text-lg font-extrabold text-ink-on-blue py-1"
+                      }
+                    >
+                      {link.label}
+                    </Link>
+                  );
+                })}
                 <div className="mt-2 grid grid-cols-1 gap-3">
                   <CtaButton
                     variant="secondary"
@@ -205,7 +237,7 @@ export function LandingFooter() {
 
   return (
     <footer className="px-3 sm:px-5 lg:px-7 pt-4 pb-6">
-      <div className="surface-slab-blue relative mx-auto max-w-[1400px] overflow-hidden rounded-slab pt-16 sm:pt-20 px-6 sm:px-12 lg:px-16">
+      <div className="surface-slab-blue relative mx-auto max-w-slab overflow-hidden rounded-slab pt-16 sm:pt-20 px-6 sm:px-12 lg:px-16">
         <ToolPattern tone="on-blue" />
 
         <div className="relative z-10 mx-auto max-w-7xl grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-12">

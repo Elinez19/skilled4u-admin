@@ -12,7 +12,23 @@ import { landingContent } from "@/content/landing";
 import { motionTokens } from "@/lib/motion";
 import { tokens } from "@/lib/tokens";
 
-export function AbujaCoverageMap() {
+export interface AbujaCoverageMapProps {
+  badge?: string;
+  headline?: string;
+  highlightWords?: readonly string[];
+  subtitle?: string;
+  showStats?: boolean;
+  showComingSoon?: boolean;
+}
+
+export function AbujaCoverageMap({
+  badge,
+  headline,
+  highlightWords = ["Abuja", "Nigeria"],
+  subtitle,
+  showStats = true,
+  showComingSoon = true,
+}: AbujaCoverageMapProps = {}) {
   const { coverage } = landingContent;
   const dotPatternId = React.useId();
 
@@ -90,30 +106,32 @@ export function AbujaCoverageMap() {
           tone="on-blue"
           eyebrow={
             <PillBadge tone="porcelain" icon="pin">
-              {coverage.badge}
+              {badge ?? coverage.badge}
             </PillBadge>
           }
-          headline={coverage.headline}
-          highlightWords={["Abuja", "Nigeria"]}
-          subtitle={coverage.subtitle}
+          headline={headline ?? coverage.headline}
+          highlightWords={highlightWords}
+          subtitle={subtitle ?? coverage.subtitle}
         />
 
         {/* Animated Count-Up Metrics */}
-        <Reveal
-          delay={0.2}
-          className="mx-auto mt-10 grid max-w-2xl grid-cols-3 gap-4 rounded-3xl border border-brand-700 bg-brand-900/75 p-5 backdrop-blur-md"
-        >
-          {coverage.stats.map((stat) => (
-            <div key={stat.label} className="text-center">
-              <div className="font-display text-2xl sm:text-4xl font-extrabold text-accent-sky">
-                <CountUp to={stat.value} suffix={stat.suffix} />
+        {showStats && (
+          <Reveal
+            delay={0.2}
+            className="mx-auto mt-10 grid max-w-2xl grid-cols-3 gap-4 rounded-3xl border border-brand-700 bg-brand-900/75 p-5 backdrop-blur-md"
+          >
+            {coverage.stats.map((stat) => (
+              <div key={stat.label} className="text-center">
+                <div className="font-display text-2xl sm:text-4xl font-extrabold text-accent-sky">
+                  <CountUp to={stat.value} suffix={stat.suffix} />
+                </div>
+                <div className="mt-1 text-xs sm:text-sm font-semibold text-ink-on-blue-muted">
+                  {stat.label}
+                </div>
               </div>
-              <div className="mt-1 text-xs sm:text-sm font-semibold text-ink-on-blue-muted">
-                {stat.label}
-              </div>
-            </div>
-          ))}
-        </Reveal>
+            ))}
+          </Reveal>
+        )}
       </div>
 
       {/* Bottom Row of Abuja Neighbourhood Bubbles */}
@@ -136,11 +154,13 @@ export function AbujaCoverageMap() {
       </div>
 
       {/* Coming Soon Footnote ("Lagos and Port Harcourt coming soon.") */}
-      <Reveal delay={0.25} className="relative z-10 mt-12 text-center">
-        <span className="inline-flex items-center gap-2 rounded-pill border border-brand-600 bg-brand-900/90 px-5 py-2 text-sm font-display font-bold text-accent-sky">
-          ✦ {coverage.comingSoonNote}
-        </span>
-      </Reveal>
+      {showComingSoon && (
+        <Reveal delay={0.25} className="relative z-10 mt-12 text-center">
+          <span className="inline-flex items-center gap-2 rounded-pill border border-brand-600 bg-brand-900/90 px-5 py-2 text-sm font-display font-bold text-accent-sky">
+            ✦ {coverage.comingSoonNote}
+          </span>
+        </Reveal>
+      )}
     </SectionSlab>
   );
 }

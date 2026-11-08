@@ -31,6 +31,9 @@ export const tokens = {
       sky: "var(--accent-sky)",
       gold: "var(--accent-gold)",
       success: "var(--accent-success)",
+      warm: "var(--accent-warm)",
+      warmDark: "var(--accent-warm-dark)",
+      warmDeep: "var(--accent-warm-deep)",
     },
     ink: {
       primary: "var(--ink-primary)",
@@ -39,6 +42,9 @@ export const tokens = {
       onBlue: "var(--ink-on-blue)",
       onBlueMuted: "var(--ink-on-blue-muted)",
     },
+  },
+  layout: {
+    containerSlab: "var(--container-slab)",
   },
   radii: {
     xs: "var(--radius-xs)",

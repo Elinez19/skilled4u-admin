@@ -86,7 +86,7 @@ function ArtisanScooterSvg({ className }: { className?: string }) {
         d="M84 56 C84 44 108 44 112 58 L118 96 H82 Z"
         fill={tokens.colors.brand[700]}
       />
-      <circle cx="102" cy="36" r="16" fill="#6E3D23" />
+      <circle cx="102" cy="36" r="16" fill={tokens.colors.accent.warmDark} />
       <path
         d="M84 36 C84 20 118 20 120 36 Z"
         fill={tokens.colors.brand[500]}

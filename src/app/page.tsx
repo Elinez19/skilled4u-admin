@@ -1,5 +1,6 @@
 import * as React from "react";
 import { AbujaCoverageMap } from "@/components/landing/composites/abuja-coverage-map";
+import { HowItWorksSection } from "@/components/landing/composites/artisan-page-sections";
 import {
   FaqSection,
   HeroSection,
@@ -41,7 +42,10 @@ export default function LandingPage() {
         {/* 3. "Every Home & Office Fix Covered" Big Glossy 3D Service Cards */}
         <ServicesGridSection />
 
-        {/* 4. "Trusted Across Abuja and Nigeria" Dotted Map + OffsetRing Bubbles */}
+        {/* 4. "How It Works" 3 Numbered Step Cards + Perks Strip */}
+        <HowItWorksSection />
+
+        {/* 5. "Trusted Across Abuja and Nigeria" Dotted Map + OffsetRing Bubbles */}
         <AbujaCoverageMap />
 
         {/* 5. "Discover Abuja's Top-Rated Artisans" Street Signposts + Dispatch Scooters */}
