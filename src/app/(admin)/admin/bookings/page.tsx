@@ -1,28 +1,28 @@
+import { Suspense } from "react";
+import { desc } from "drizzle-orm";
+import { BookingsDispatchWorkspace } from "@/components/admin/composites/bookings-dispatch-workspace";
+import { AdminLoadingState } from "@/components/admin/ui/admin-loading-state";
 import { db } from "@/db";
 import { bookings } from "@/db/schema";
-import { desc } from "drizzle-orm";
-import { BookingsManager } from "@/components/admin/bookings-manager";
 
-export default async function AdminBookingsPage() {
+async function BookingsLoader() {
   const rows = await db
     .select()
     .from(bookings)
     .orderBy(desc(bookings.createdAt));
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-950">
-          Bookings &amp; Dispatch Management
-        </h1>
-        <p className="text-sm text-zinc-500">
-          Track client requests, artisan dispatch progress, and job completion
-          confirmations.
-        </p>
-      </div>
+  return <BookingsDispatchWorkspace initialBookings={rows} />;
+}
 
-      <BookingsManager initialBookings={rows} />
-    </div>
+export default function AdminBookingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <AdminLoadingState label="Loading service bookings & live dispatch queue..." />
+      }
+    >
+      <BookingsLoader />
+    </Suspense>
   );
 }
 

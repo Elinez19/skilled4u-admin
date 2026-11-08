@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 export interface OffsetRingProps {
   children: React.ReactNode;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
   faceTone?: "ink" | "blue" | "porcelain";
   className?: string;
   interactive?: boolean;
@@ -16,7 +16,8 @@ export interface OffsetRingProps {
 }
 
 const sizeClasses = {
-  sm: "h-12 w-12 text-xs",
+  xs: "h-9 w-9 text-xs",
+  sm: "h-11 w-11 text-xs",
   md: "h-16 w-16 text-sm",
   lg: "h-28 w-28 text-lg sm:h-32 sm:w-32 sm:text-xl",
   xl: "h-36 w-36 text-xl sm:h-40 sm:w-40 sm:text-2xl",
@@ -71,7 +72,8 @@ export function OffsetRing({
       {/* Main Front Disc */}
       <span
         className={cn(
-          "grid h-full w-full place-items-center rounded-pill px-3 text-center shadow-gloss-float",
+          "grid h-full w-full place-items-center rounded-pill text-center shadow-gloss-float",
+          size === "xs" || size === "sm" ? "px-1.5" : "px-3",
           faceClasses[faceTone]
         )}
       >

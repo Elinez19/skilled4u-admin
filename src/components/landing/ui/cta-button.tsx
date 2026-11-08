@@ -11,12 +11,12 @@ export type CtaIconType = "apple" | "play" | "sparkle" | "none";
 
 export interface CtaButtonProps {
   /**
-   * Strictly 2 CTA variants across the entire landing page:
+   * Strictly 2 CTA variants across the entire landing page & admin portal:
    * - "primary": Big Glossy Electric Blue with pure white text
    * - "secondary": Big Glossy Porcelain White with vibrant electric blue text
    */
   variant?: CtaVariant;
-  size?: "md" | "lg";
+  size?: "xs" | "sm" | "lg" | "md";
   leadingIcon?: CtaIconType;
   trailingArrow?: boolean;
   href?: string;
@@ -24,6 +24,7 @@ export interface CtaButtonProps {
   children: React.ReactNode;
   className?: string;
   type?: "button" | "submit";
+  disabled?: boolean;
 }
 
 function AppleStoreIcon({ className }: { className?: string }) {
@@ -68,6 +69,7 @@ export function CtaButton({
   children,
   className,
   type = "button",
+  disabled = false,
 }: CtaButtonProps) {
   const isPrimary = variant === "primary";
 
@@ -88,19 +90,35 @@ export function CtaButton({
       {leadingIcon === "play" && <PlayStoreIcon />}
       {leadingIcon === "sparkle" && <Sparkles className="h-5 w-5 shrink-0" />}
 
-      <span className="relative z-10 tracking-tight">{children}</span>
+      <span
+        className={cn(
+          "relative z-10 inline-flex items-center tracking-tight",
+          size === "xs" ? "gap-1.5" : "gap-2"
+        )}
+      >
+        {children}
+      </span>
 
       {trailingArrow && (
-        <ArrowRight className="relative z-10 h-5 w-5 shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
+        <ArrowRight
+          className={cn(
+            "relative z-10 shrink-0 transition-transform duration-300 group-hover:translate-x-1",
+            size === "xs" || size === "sm" ? "h-3.5 w-3.5" : "h-5 w-5"
+          )}
+        />
       )}
     </>
   );
 
   const sharedClasses = cn(
-    "group relative isolate inline-flex items-center justify-center gap-3 overflow-hidden rounded-pill font-display font-extrabold select-none cursor-pointer transition-shadow focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent-sky",
+    "group relative isolate inline-flex items-center justify-center overflow-hidden rounded-pill font-display font-extrabold select-none cursor-pointer transition-shadow focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent-sky disabled:pointer-events-none disabled:opacity-60",
     size === "lg"
-      ? "h-14 px-8 text-base sm:h-15 sm:px-9 sm:text-lg"
-      : "h-12 px-6 text-sm sm:text-base",
+      ? "h-14 px-8 text-base gap-3 sm:h-15 sm:px-9 sm:text-lg"
+      : size === "md"
+        ? "h-12 px-6 text-sm gap-2.5 sm:text-base"
+        : size === "sm"
+          ? "h-9 px-3.5 text-xs gap-2"
+          : "h-8 px-3 text-xs gap-1.5",
     isPrimary ? "cta-surface-primary" : "cta-surface-secondary",
     className
   );
@@ -123,9 +141,10 @@ export function CtaButton({
   return (
     <motion.button
       type={type}
+      disabled={disabled}
       onClick={onClick}
-      whileHover={{ y: -3, scale: 1.02 }}
-      whileTap={{ scale: 0.97 }}
+      whileHover={disabled ? undefined : { y: -3, scale: 1.02 }}
+      whileTap={disabled ? undefined : { scale: 0.97 }}
       transition={motionTokens.spring.snappy}
       className={sharedClasses}
     >

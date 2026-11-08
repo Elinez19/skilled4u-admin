@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 export interface BrandLogoProps {
   tone?: "on-blue" | "on-light";
-  size?: "md" | "lg";
+  size?: "sm" | "md" | "lg";
   className?: string;
 }
 
@@ -19,26 +19,48 @@ export function BrandLogo({
   const isOnBlue = tone === "on-blue";
 
   return (
-    <div className={cn("inline-flex items-center gap-3 select-none", className)}>
+    <div
+      className={cn(
+        "inline-flex items-center select-none",
+        size === "sm" ? "gap-2.5" : "gap-3",
+        className
+      )}
+    >
       <span
         className={cn(
           "relative grid place-items-center rounded-2xl border-2 transition-transform duration-300 group-hover:scale-105",
-          size === "lg" ? "h-12 w-12" : "h-11 w-11",
+          size === "lg"
+            ? "h-12 w-12"
+            : size === "sm"
+              ? "h-9 w-9 rounded-xl"
+              : "h-11 w-11",
           isOnBlue
             ? "bg-surface-porcelain text-brand-600 border-surface-porcelain shadow-gloss-card"
             : "cta-surface-primary text-ink-on-blue"
         )}
       >
-        <Wrench className={cn(size === "lg" ? "h-6 w-6" : "h-5 w-5")} />
+        <Wrench
+          className={cn(
+            size === "lg"
+              ? "h-6 w-6"
+              : size === "sm"
+                ? "h-4 w-4"
+                : "h-5 w-5"
+          )}
+        />
         <span
-          className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-surface-porcelain bg-accent-sky"
+          className="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full border-2 border-surface-porcelain bg-accent-sky"
           aria-hidden="true"
         />
       </span>
       <span
         className={cn(
           "font-display font-extrabold tracking-tight",
-          size === "lg" ? "text-3xl" : "text-2xl",
+          size === "lg"
+            ? "text-3xl"
+            : size === "sm"
+              ? "text-xl"
+              : "text-2xl",
           isOnBlue ? "text-ink-on-blue" : "text-brand-950"
         )}
       >
