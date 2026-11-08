@@ -18,7 +18,7 @@ export default function AdminFinancialsPage() {
   return (
     <Suspense
       fallback={
-        <AdminLoadingState label="Loading Bachs.io financials & escrow settlements..." />
+        <AdminLoadingState label="Loading financial ledger, commissions & artisan payouts..." />
       }
     >
       <FinancialsLoader />

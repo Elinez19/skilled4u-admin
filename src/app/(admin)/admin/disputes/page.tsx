@@ -135,11 +135,11 @@ export default function AdminDisputesPage() {
   return (
     <div className="space-y-3 sm:space-y-4">
       <AdminHeroBanner
-        eyebrow="Bachs.io Escrow Arbitration Desk"
+        eyebrow="Customer & Artisan Case Resolution"
         eyebrowIcon="shield"
         headline="Disputes & Escrow Resolution."
         highlightWords={["Disputes", "Escrow", "Resolution."]}
-        subtitle="Audit client-artisan job claims, freeze or release locked 90/10 Bachs.io escrow funds, and enforce marketplace quality guarantees."
+        subtitle="Investigate service claims between customers and artisans, review job evidence, hold or release escrow funds, and authorize fair refunds or settlements."
         primaryCta={{
           label: "Open Financials Ledger",
           href: "/admin/financials",
@@ -160,7 +160,7 @@ export default function AdminDisputesPage() {
               label="Active Dispute Cases"
               value={`${openCount}`}
               numericValue={openCount}
-              badgeText="Awaiting arbitration sign-off"
+              badgeText="Awaiting case resolution sign-off"
               badgeTone="porcelain"
               badgeIcon="dot"
               ringTone="blue"
@@ -172,7 +172,7 @@ export default function AdminDisputesPage() {
             <AdminKpiCard
               label="Escrow Frozen in Dispute"
               value={formatCurrency(frozenEscrow)}
-              badgeText="Protected in Bachs.io vault"
+              badgeText="Held safely during case review"
               badgeTone="sky"
               badgeIcon="shield"
               ringTone="ink"
@@ -213,8 +213,8 @@ export default function AdminDisputesPage() {
 
         <div className="mt-4">
           <AdminDataTable
-            title="Marketplace Arbitration Queue"
-            subtitle="Review evidence logs and authorize Bachs.io escrow release or client refund."
+            title="Marketplace Dispute & Arbitration Queue"
+            subtitle="Review customer and artisan reports, mediate service quality claims, and authorize payout release or refund."
             badge={`${filtered.length} Showing`}
           >
             {filtered.length === 0 ? (

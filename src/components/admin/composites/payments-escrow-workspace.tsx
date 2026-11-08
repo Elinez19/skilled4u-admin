@@ -160,13 +160,13 @@ export function PaymentsEscrowWorkspace({
   return (
     <div className="space-y-2 sm:space-y-4">
       <AdminHeroBanner
-        eyebrow="Bachs.io Multi-Currency Escrow"
+        eyebrow="Marketplace Financials & Escrow"
         eyebrowIcon="dot"
         headline="Payments & Escrow Ledger."
         highlightWords={["Payments", "Escrow", "Ledger."]}
-        subtitle="Audit client escrow deposits, track the 90% Artisan / 10% Platform commission split, and trigger instant NUBAN bank settlements."
+        subtitle="Manage customer escrow deposits, track artisan payouts and platform commissions, and release settlements once bookings are completed."
         primaryCta={{
-          label: "Initialize Bachs.io Checkout",
+          label: "Record Escrow Deposit",
           onClick: () => setModalOpen(true),
           variant: "primary",
           icon: <Plus className="h-4 w-4" />,
@@ -186,7 +186,7 @@ export function PaymentsEscrowWorkspace({
             <AdminKpiCard
               label="Total Gross Volume"
               value={formatCurrency(totalVolume)}
-              badgeText={`${items.length} Bachs.io transactions`}
+              badgeText={`${items.length} recorded transactions`}
               badgeTone="porcelain"
               badgeIcon="dot"
               ringTone="blue"
@@ -198,7 +198,7 @@ export function PaymentsEscrowWorkspace({
             <AdminKpiCard
               label="Escrow Locked (In Hold)"
               value={formatCurrency(heldVolume)}
-              badgeText="Protected until job sign-off"
+              badgeText="Protected until customer job sign-off"
               badgeTone="sky"
               badgeIcon="shield"
               ringTone="ink"
@@ -240,14 +240,14 @@ export function PaymentsEscrowWorkspace({
         {/* Payments Ledger Table */}
         <div className="mt-4">
           <AdminDataTable
-            title="Bachs.io Escrow & Settlement Ledger"
-            subtitle="All marketplace deposits, 10% platform commissions, and 90% artisan bank settlements."
+            title="Escrow & Payout Settlement Ledger"
+            subtitle="Track customer booking deposits, platform commissions, and artisan bank settlements."
             badge={`${filtered.length} Showing`}
           >
             {filtered.length === 0 ? (
               <AdminEmptyState
                 title="No Escrow Records Found"
-                description="Initialize a new Bachs.io checkout deposit or clear your search filter."
+                description="Record a new customer escrow deposit or clear your active search filter."
                 icon={<CreditCard className="h-5 w-5 text-accent-sky" />}
                 action={
                   <CtaButton
@@ -256,7 +256,7 @@ export function PaymentsEscrowWorkspace({
                     onClick={() => setModalOpen(true)}
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    <span>Initialize Bachs.io Checkout</span>
+                    <span>Record Escrow Deposit</span>
                   </CtaButton>
                 }
               />
@@ -264,7 +264,7 @@ export function PaymentsEscrowWorkspace({
               <AdminTable>
                 <AdminTableHeader>
                   <AdminTableRow>
-                    <AdminTableHead>Bachs Reference</AdminTableHead>
+                    <AdminTableHead>Transaction Reference</AdminTableHead>
                     <AdminTableHead>Client</AdminTableHead>
                     <AdminTableHead>Artisan Beneficiary</AdminTableHead>
                     <AdminTableHead>Gross Amount</AdminTableHead>
@@ -284,7 +284,7 @@ export function PaymentsEscrowWorkspace({
                           {pay.reference}
                         </div>
                         <div className="font-mono text-[10px] font-semibold text-ink-muted">
-                          {pay.bachsTransactionId || "awaiting_webhook"}
+                          {pay.bachsTransactionId || "pending_confirmation"}
                         </div>
                       </AdminTableCell>
 
@@ -367,13 +367,13 @@ export function PaymentsEscrowWorkspace({
         </div>
       </AdminWorkspaceSlab>
 
-      {/* Initialize Bachs.io Checkout Modal */}
+      {/* Record Escrow Deposit Modal */}
       <AdminModal
         open={modalOpen}
         onOpenChange={setModalOpen}
-        eyebrow="Bachs.io Escrow Deposit"
-        title="Initialize Escrow Checkout"
-        description="Creates a new transaction via `/api/v1/payments/initialize` and locks the 90/10 marketplace escrow split."
+        eyebrow="Escrow Payment Management"
+        title="Record Escrow Deposit"
+        description="Log a customer booking payment, calculate the artisan payout and platform commission, and hold funds safely in escrow until job completion."
       >
         <form onSubmit={handleInitializePayment} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -410,7 +410,7 @@ export function PaymentsEscrowWorkspace({
           </div>
 
           <AdminSelectPills
-            label="Bachs.io Payment Channel"
+            label="Payment Method"
             options={CHANNEL_OPTIONS}
             value={paymentMethod}
             onChange={setPaymentMethod}

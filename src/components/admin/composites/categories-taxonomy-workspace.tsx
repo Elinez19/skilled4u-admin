@@ -83,11 +83,11 @@ export function CategoriesTaxonomyWorkspace({
   return (
     <div className="space-y-2 sm:space-y-4">
       <AdminHeroBanner
-        eyebrow="Mobile App Taxonomy & Pricing"
+        eyebrow="Service Catalog & Pricing Management"
         eyebrowIcon="shield"
         headline="Service Categories & Pricing."
         highlightWords={["Categories", "Pricing."]}
-        subtitle="Manage the official Skilled4U service catalog, sub-service tags, and base inspection pricing synced with the mobile app."
+        subtitle="Manage marketplace service categories, organize bookable sub-services, and set standard starting rates for customer bookings and artisan dispatches."
         primaryCta={{
           label: "Add Service Category",
           onClick: () => setModalOpen(true),
@@ -117,7 +117,7 @@ export function CategoriesTaxonomyWorkspace({
               tone="sky"
               className="hidden sm:inline-flex px-3 py-1 text-xs"
             >
-              Synced via /api/v1/categories
+              Active in Customer Catalog
             </PillBadge>
           </div>
 
@@ -230,9 +230,9 @@ export function CategoriesTaxonomyWorkspace({
       <AdminModal
         open={modalOpen}
         onOpenChange={setModalOpen}
-        eyebrow="Catalog Expansion"
-        title="Create Marketplace Category"
-        description="Adds a new service category to Neon PostgreSQL and immediately exposes it to the skilled4U mobile app via `/api/v1/categories`."
+        eyebrow="Catalog Management"
+        title="Create Service Category"
+        description="Add a new service category with standard base pricing and bookable sub-services for customers and artisans."
       >
         <form onSubmit={handleCreateCategory} className="space-y-4">
           <AdminTextField

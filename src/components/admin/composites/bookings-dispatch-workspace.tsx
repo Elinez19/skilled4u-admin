@@ -158,11 +158,11 @@ export function BookingsDispatchWorkspace({
   return (
     <div className="space-y-2 sm:space-y-4">
       <AdminHeroBanner
-        eyebrow="Live Dispatch Queue · Abuja & Lagos"
+        eyebrow="Service Scheduling & Live Dispatch"
         eyebrowIcon="pin"
-        headline="Bookings & Dispatch Desk."
-        highlightWords={["Bookings", "Dispatch", "Desk."]}
-        subtitle="Track incoming client fix requests, assign verified artisans, and advance job states from dispatch to completion."
+        headline="Bookings & Dispatch Management."
+        highlightWords={["Bookings", "Dispatch", "Management."]}
+        subtitle="Track incoming customer service requests, assign qualified artisans to jobs, manage appointment schedules, and advance bookings from acceptance to completion."
         primaryCta={{
           label: "New Dispatch Booking",
           onClick: () => setModalOpen(true),
@@ -170,8 +170,8 @@ export function BookingsDispatchWorkspace({
           icon: <Plus className="h-4 w-4" />,
         }}
         secondaryCta={{
-          label: "Escrow Ledger",
-          href: "/admin/payments",
+          label: "Financials & Escrow",
+          href: "/admin/financials",
           variant: "secondary",
           trailingArrow: true,
         }}
@@ -347,9 +347,9 @@ export function BookingsDispatchWorkspace({
       <AdminModal
         open={modalOpen}
         onOpenChange={setModalOpen}
-        eyebrow="Live Dispatch Creation"
+        eyebrow="Service Booking & Dispatch"
         title="Create Service Booking"
-        description="Dispatches a verified Skilled4U artisan and logs the booking in Neon PostgreSQL via `/api/v1/bookings`."
+        description="Schedule a new customer service request, assign a verified artisan, and set the agreed service fee."
       >
         <form onSubmit={handleCreateBooking} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

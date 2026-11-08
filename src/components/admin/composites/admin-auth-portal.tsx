@@ -3,7 +3,6 @@
 import * as React from "react";
 import {
   ArrowRight,
-  Database,
   KeyRound,
   Loader2,
   Lock,
@@ -11,6 +10,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   UserCheck,
+  Users,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -140,9 +140,9 @@ export function AdminAuthPortal() {
 
             <Reveal delay={0.14}>
               <p className="max-w-md text-xs sm:text-sm font-semibold leading-relaxed text-ink-on-blue-muted">
-                Secured by Better-Auth &amp; Neon PostgreSQL. Sign in to verify
-                Abuja &amp; Lagos artisans, dispatch home fix bookings, and
-                release 90/10 Bachs.io escrow payouts.
+                Sign in to manage customer, artisan, and administrator accounts,
+                coordinate service bookings and dispatches, resolve disputes,
+                moderate reviews, and oversee platform payouts.
               </p>
             </Reveal>
 
@@ -157,7 +157,7 @@ export function AdminAuthPortal() {
               </Float>
               <Float amplitude={6} duration={5.2} delay={0.25}>
                 <OffsetRing size="sm" faceTone="porcelain">
-                  <Database className="h-4 w-4 text-brand-600" />
+                  <Users className="h-4 w-4 text-brand-600" />
                 </OffsetRing>
               </Float>
               <Float amplitude={5} duration={4.9} delay={0.45}>
@@ -187,12 +187,12 @@ export function AdminAuthPortal() {
                   <h2 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight text-brand-950">
                     {mode === "signin"
                       ? "Sign In to Console"
-                      : "Initialize Admin"}
+                      : "Create Admin Account"}
                   </h2>
                   <p className="mt-0.5 text-xs font-medium text-ink-secondary">
                     {mode === "signin"
-                      ? "Enter your Better-Auth administrator credentials."
-                      : "Create your administrator account in Neon PostgreSQL."}
+                      ? "Enter your administrator credentials to access marketplace management."
+                      : "Register a new administrator profile to oversee users, bookings, and support."}
                   </p>
                 </div>
 

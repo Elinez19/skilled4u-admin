@@ -5,11 +5,9 @@ import {
   ArrowUpRight,
   CalendarCheck,
   CheckCircle2,
-  CreditCard,
   Layers,
   Lock,
   ShieldAlert,
-  ShieldCheck,
   TrendingUp,
   Users,
   Wrench,
@@ -94,23 +92,23 @@ export function OverviewDashboard({
     <div className="space-y-3 sm:space-y-4">
       {/* 1. Hero Banner Slab with hero-bg.jpg + OffsetRing Cluster + Strictly 2 CTAs */}
       <AdminHeroBanner
-        eyebrow="Live Operations · Neon PostgreSQL & Bachs.io"
+        eyebrow="Marketplace Operations & Governance"
         eyebrowIcon="dot"
-        headline="Marketplace Command & Escrow Desk."
-        highlightWords={["Command", "Escrow", "Desk."]}
-        subtitle="Monitor real-time Abuja & Lagos artisan dispatches, approve NIN/KYC credentials, and release 90/10 Bachs.io escrow settlements."
+        headline="Operations & User Management Desk."
+        highlightWords={["Operations", "Management", "Desk."]}
+        subtitle="Manage customers, artisans, and administrators, coordinate service bookings and dispatches, oversee categories and reviews, and resolve disputes and support tickets."
         primaryCta={{
-          label: "Bachs.io Escrow Ledger",
-          href: "/admin/payments",
+          label: "Manage Users",
+          href: "/admin/user-management",
           variant: "primary",
-          icon: <CreditCard className="h-3.5 w-3.5" />,
+          icon: <Users className="h-3.5 w-3.5" />,
           trailingArrow: true,
         }}
         secondaryCta={{
-          label: "Artisan KYC Desk",
-          href: "/admin/artisans",
+          label: "Bookings & Dispatch",
+          href: "/admin/bookings",
           variant: "secondary",
-          icon: <ShieldCheck className="h-3.5 w-3.5" />,
+          icon: <CalendarCheck className="h-3.5 w-3.5" />,
         }}
         rightSlot={
           <div className="hidden xl:flex items-center gap-3.5 pr-1">
@@ -156,9 +154,9 @@ export function OverviewDashboard({
         <Stagger className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
           <StaggerItem>
             <AdminKpiCard
-              label="Gross Merchandise Value"
+              label="Gross Booking Volume"
               value={formatCurrency(totalGmv)}
-              badgeText={`${formatCurrency(totalCommission)} platform fee (10%)`}
+              badgeText={`${formatCurrency(totalCommission)} platform commission (10%)`}
               badgeTone="porcelain"
               badgeIcon="dot"
               ringTone="blue"
@@ -168,9 +166,9 @@ export function OverviewDashboard({
 
           <StaggerItem>
             <AdminKpiCard
-              label="Bachs.io Escrow in Hold"
+              label="Escrow Funds on Hold"
               value={formatCurrency(escrowHeldAmount)}
-              badgeText="Awaiting job completion sign-off"
+              badgeText="Awaiting customer job completion sign-off"
               badgeTone="sky"
               badgeIcon="shield"
               ringTone="ink"
@@ -183,7 +181,7 @@ export function OverviewDashboard({
               label="Total Service Bookings"
               value={`${bookings.length}`}
               numericValue={bookings.length}
-              badgeText={`Across ${categories.length} active categories`}
+              badgeText={`Across ${categories.length} service categories`}
               badgeTone="sky"
               badgeIcon="pin"
               ringTone="porcelain"
@@ -193,9 +191,9 @@ export function OverviewDashboard({
 
           <StaggerItem>
             <AdminKpiCard
-              label="Artisans & KYC Queue"
+              label="Users & Artisan KYC"
               value={`${verifiedArtisansCount} Verified`}
-              badgeText={`${pendingKycArtisans.length} pending NIN/KYC approval`}
+              badgeText={`${pendingKycArtisans.length} artisans pending verification`}
               badgeTone="blue"
               badgeIcon="shield"
               ringTone="ink"
@@ -356,22 +354,23 @@ export function OverviewDashboard({
                 <div className="flex items-center gap-2">
                   <ShieldAlert className="h-4 w-4 text-accent-gold shrink-0" />
                   <span className="font-display text-xs font-extrabold text-ink-on-blue">
-                    Verification Checklist
+                    User &amp; Role Management Guide
                   </span>
                 </div>
                 <p className="text-[11px] font-medium leading-relaxed text-ink-on-blue-muted">
-                  Confirm NIN slip match, trade certification, and Nigerian
-                  NUBAN settlement account name before enabling live dispatch.
+                  Verify artisan identity and bank payout accounts, review
+                  customer booking activity, and manage administrator roles from
+                  the user management desk.
                 </p>
                 <div className="pt-0.5">
                   <CtaButton
                     variant="primary"
                     size="xs"
-                    href="/admin/artisans"
+                    href="/admin/user-management"
                     trailingArrow
                     className="w-full"
                   >
-                    Open Full KYC Desk
+                    Open User Management Desk
                   </CtaButton>
                 </div>
               </div>

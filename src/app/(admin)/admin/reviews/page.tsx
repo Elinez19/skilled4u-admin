@@ -116,13 +116,13 @@ export default function AdminReviewsPage() {
   return (
     <div className="space-y-3 sm:space-y-4">
       <AdminHeroBanner
-        eyebrow="Verified Client Feedback & Trust"
+        eyebrow="Customer Feedback & Quality Assurance"
         eyebrowIcon="dot"
         headline="Reviews & Rating Moderation."
         highlightWords={["Reviews", "Rating", "Moderation."]}
-        subtitle="Audit verified post-booking client ratings, moderate artisan testimonials, and maintain high-trust marketplace quality scores."
+        subtitle="Moderate customer reviews after completed bookings, verify service ratings, and maintain quality standards across artisan profiles."
         primaryCta={{
-          label: "UserManagement Desk",
+          label: "User Management Desk",
           href: "/admin/user-management",
           variant: "primary",
           trailingArrow: true,
@@ -153,7 +153,7 @@ export default function AdminReviewsPage() {
               label="Verified Reviews Published"
               value={`${verifiedCount}`}
               numericValue={verifiedCount}
-              badgeText="Synced to artisan public profiles"
+              badgeText="Visible on artisan public profiles"
               badgeTone="sky"
               badgeIcon="shield"
               ringTone="ink"
@@ -163,9 +163,9 @@ export default function AdminReviewsPage() {
 
           <StaggerItem>
             <AdminKpiCard
-              label="Client Satisfaction Score"
+              label="Customer Satisfaction Score"
               value="98.4%"
-              badgeText="Escrow release approval rate"
+              badgeText="Completed job approval rate"
               badgeTone="blue"
               badgeIcon="shield"
               ringTone="ink"
@@ -194,7 +194,7 @@ export default function AdminReviewsPage() {
         <div className="mt-4">
           <AdminDataTable
             title="Customer Reviews & Ratings Ledger"
-            subtitle="Every review is linked to a completed Bachs.io escrow booking."
+            subtitle="Verify customer feedback from completed service bookings and publish approved ratings to artisan profiles."
             badge={`${filtered.length} Showing`}
           >
             {filtered.length === 0 ? (

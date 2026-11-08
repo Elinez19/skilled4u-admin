@@ -7,7 +7,6 @@ import {
   CalendarCheck,
   ChevronRight,
   CreditCard,
-  Database,
   ExternalLink,
   Headset,
   Layers,
@@ -56,13 +55,13 @@ export interface AdminNavItem {
 export const ADMIN_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
   {
     label: "Overview",
-    subtitle: "Live metrics & KPIs",
+    subtitle: "Marketplace summary & activity",
     href: "/admin",
     icon: "overview",
   },
   {
     label: "Bookings",
-    subtitle: "Job dispatch & queue",
+    subtitle: "Manage bookings & dispatch",
     href: "/admin/bookings",
     icon: "bookings",
   },
@@ -74,37 +73,37 @@ export const ADMIN_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
   },
   {
     label: "Disputes",
-    subtitle: "Escrow arbitration desk",
+    subtitle: "Claims & escrow resolution",
     href: "/admin/disputes",
     icon: "disputes",
   },
   {
     label: "Financials",
-    subtitle: "Bachs.io 90/10 ledger",
+    subtitle: "Payouts, fees & escrow ledger",
     href: "/admin/financials",
     icon: "financials",
   },
   {
     label: "Reviews",
-    subtitle: "Client ratings & feedback",
+    subtitle: "Customer ratings & moderation",
     href: "/admin/reviews",
     icon: "reviews",
   },
   {
     label: "Settings",
-    subtitle: "Platform configuration",
+    subtitle: "Policies, fees & preferences",
     href: "/admin/settings",
     icon: "settings",
   },
   {
     label: "Support",
-    subtitle: "Helpdesk & SLA tickets",
+    subtitle: "Customer & artisan helpdesk",
     href: "/admin/support",
     icon: "support",
   },
   {
     label: "UserManagement",
-    subtitle: "Artisans, clients & KYC",
+    subtitle: "Customers, artisans & admins",
     href: "/admin/user-management",
     icon: "user-management",
   },
@@ -280,9 +279,9 @@ function SidebarContent({
         </div>
       </div>
 
-      {/* Bottom Stack Telemetry & Auth Actions */}
+      {/* Bottom Operations Status & Auth Actions */}
       <div className="relative z-10 mt-2 space-y-2 border-t border-brand-100 pt-2.5">
-        {/* Glossy Stack Telemetry Card */}
+        {/* Glossy Operations Status Card */}
         <div className="rounded-2xl border-2 border-brand-100 bg-surface-pearl/90 p-2.5 shadow-gloss-card space-y-1.5">
           <div className="flex items-center gap-2">
             <OffsetRing size="xs" faceTone="blue" className="h-7 w-7 shrink-0">
@@ -290,22 +289,22 @@ function SidebarContent({
             </OffsetRing>
             <div className="min-w-0">
               <p className="font-display text-[11px] font-extrabold text-brand-950 leading-tight">
-                Stack Status: Online
+                Marketplace Active
               </p>
               <p className="truncate text-[10px] font-semibold text-brand-600 leading-tight">
-                Neon · Drizzle · Bachs.io
+                Customers · Artisans · Admins
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-1">
             <span className="inline-flex items-center gap-1 rounded-pill bg-surface-porcelain px-2 py-0.5 font-display text-[9px] font-extrabold text-brand-700 border border-brand-100">
-              <Database className="h-2.5 w-2.5 text-brand-600" />
-              Postgres
+              <Users className="h-2.5 w-2.5 text-brand-600" />
+              Verified Pros
             </span>
             <span className="inline-flex items-center gap-1 rounded-pill bg-surface-porcelain px-2 py-0.5 font-display text-[9px] font-extrabold text-brand-700 border border-brand-100">
               <Lock className="h-2.5 w-2.5 text-accent-gold" />
-              90/10 Escrow
+              Escrow Safe
             </span>
           </div>
         </div>
@@ -348,20 +347,20 @@ interface AdminDashboardNavbarProps {
 const LIVE_ALERTS = [
   {
     id: "alert-escrow",
-    title: "Bachs.io Escrow Settlement Ready",
-    detail: "90/10 split verified for Abuja A.C servicing dispatch.",
+    title: "Artisan Payout Settlement Ready",
+    detail: "Completed A.C servicing job verified and ready for payout release.",
     href: "/admin/financials",
   },
   {
     id: "alert-kyc",
-    title: "NIN & NUBAN KYC Verification",
-    detail: "Artisan identity credentials ready for admin sign-off.",
+    title: "User & Artisan Verification",
+    detail: "New artisan identity and payout credentials awaiting review.",
     href: "/admin/user-management",
   },
   {
     id: "alert-dispute",
-    title: "Escrow Arbitration Queue",
-    detail: "Review open service quality & payout hold requests.",
+    title: "Dispute Resolution Queue",
+    detail: "Review open customer service claims and payment hold requests.",
     href: "/admin/disputes",
   },
 ] as const;

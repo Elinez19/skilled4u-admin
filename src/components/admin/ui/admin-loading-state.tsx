@@ -4,7 +4,7 @@ import { OffsetRing } from "@/components/brand/offset-ring";
 import { PillBadge } from "@/components/landing/ui/pill-badge";
 
 export function AdminLoadingState({
-  label = "Loading live Neon PostgreSQL telemetry...",
+  label = "Loading marketplace management records...",
 }: {
   label?: string;
 }) {

@@ -14,7 +14,7 @@ export default function AdminUserManagementPage() {
   return (
     <Suspense
       fallback={
-        <AdminLoadingState label="Loading user management & NIN/KYC verification records..." />
+        <AdminLoadingState label="Loading customers, artisans & administrator accounts..." />
       }
     >
       <UserManagementLoader />

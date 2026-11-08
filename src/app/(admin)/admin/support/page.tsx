@@ -75,7 +75,7 @@ const INITIAL_TICKETS: SupportTicket[] = [
     ticketCode: "SUP-4085",
     requesterName: "Toluwalase Adeyemi",
     requesterRole: "Client",
-    subject: "Bachs.io Escrow Receipt Confirmation for Booking #S4U-8710",
+    subject: "Payment Receipt & Escrow Release Confirmation for Booking #S4U-8710",
     city: "Lagos",
     priority: "Normal",
     status: "completed",
@@ -131,11 +131,11 @@ export default function AdminSupportPage() {
       <AdminHeroBanner
         eyebrow="Customer & Artisan Helpdesk"
         eyebrowIcon="dot"
-        headline="Support & SLA Concierge."
-        highlightWords={["Support", "SLA", "Concierge."]}
-        subtitle="Assist clients and verified artisans across Abuja & Lagos with dispatch rescheduling, KYC uploads, and escrow payout inquiries."
+        headline="Support & Helpdesk Management."
+        highlightWords={["Support", "Helpdesk", "Management."]}
+        subtitle="Assist customers and verified artisans with booking schedule changes, identity verification inquiries, and payout support requests."
         primaryCta={{
-          label: "Disputes Arbitration",
+          label: "Disputes & Claims",
           href: "/admin/disputes",
           variant: "primary",
           trailingArrow: true,
@@ -206,8 +206,8 @@ export default function AdminSupportPage() {
 
         <div className="mt-4">
           <AdminDataTable
-            title="Live Support & Concierge Queue"
-            subtitle="Respond to artisan NUBAN updates and customer booking inquiries."
+            title="Live Support & Helpdesk Queue"
+            subtitle="Respond to artisan account updates, customer booking questions, and service support tickets."
             badge={`${filtered.length} Showing`}
           >
             {filtered.length === 0 ? (

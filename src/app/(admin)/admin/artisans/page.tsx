@@ -14,7 +14,7 @@ export default function AdminArtisansPage() {
   return (
     <Suspense
       fallback={
-        <AdminLoadingState label="Loading artisans & NIN/KYC verification records..." />
+        <AdminLoadingState label="Loading customers, artisans & admin user records..." />
       }
     >
       <ArtisansLoader />

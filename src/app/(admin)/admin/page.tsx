@@ -28,7 +28,7 @@ export default function AdminOverviewPage() {
   return (
     <Suspense
       fallback={
-        <AdminLoadingState label="Loading marketplace operations & escrow telemetry..." />
+        <AdminLoadingState label="Loading marketplace overview, bookings & user activity..." />
       }
     >
       <OverviewLoader />
