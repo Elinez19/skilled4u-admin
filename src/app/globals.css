@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  /* Legacy Admin Tokens (Preserved for /admin) */
   --background: #ffffff;
   --foreground: #09090b;
   --card: #ffffff;
@@ -21,9 +22,126 @@
   --input: #e4e4e7;
   --ring: #059669;
   --radius: 0.75rem;
+
+  /* =========================================================================
+   * SKILLED4U CUSTOM DESIGN SYSTEM TOKENS (Vibrant Electric Blue & Glossy White)
+   * ========================================================================= */
+
+  /* 1. Brand Electric Blue Scale */
+  --brand-50: #eff5ff;
+  --brand-100: #dbe8ff;
+  --brand-200: #b8d3ff;
+  --brand-300: #80b2ff;
+  --brand-400: #478bff;
+  --brand-500: #1f64ff;
+  --brand-600: #0e46f5;
+  --brand-700: #0a35c7;
+  --brand-800: #0a2999;
+  --brand-900: #091e70;
+  --brand-950: #05113d;
+
+  /* 2. Glossy Porcelain & Pearl Surface Scale */
+  --surface-porcelain: #ffffff;
+  --surface-pearl: #f6f9ff;
+  --surface-mist: #edf3ff;
+  --surface-frost: #d8e4ff;
+  --surface-glass: rgba(255, 255, 255, 0.88);
+  --surface-glass-dark: rgba(5, 17, 61, 0.86);
+
+  /* 3. Semantic & High-Contrast Accent Tokens */
+  --accent-sky: #5ce1ff;
+  --accent-gold: #ffb800;
+  --accent-success: #00c47e;
+
+  /* 4. High-Contrast Typography Hierarchy Tokens */
+  --ink-primary: #05113d;
+  --ink-secondary: #3b4e7a;
+  --ink-muted: #5b6f9e;
+  --ink-on-blue: #ffffff;
+  --ink-on-blue-muted: #dce8ff;
+
+  /* 5. Radii Tokens */
+  --radius-xs: 0.625rem;
+  --radius-sm: 0.875rem;
+  --radius-md: 1.25rem;
+  --radius-lg: 1.75rem;
+  --radius-card: 2.25rem;
+  --radius-slab: 2.5rem;
+  --radius-pill: 9999px;
+
+  /* 6. Glossy Gradients & Specular Recipes */
+  --gloss-primary-cta: linear-gradient(
+    180deg,
+    var(--brand-400) 0%,
+    var(--brand-600) 48%,
+    var(--brand-700) 100%
+  );
+  --gloss-secondary-cta: linear-gradient(
+    180deg,
+    var(--surface-porcelain) 0%,
+    var(--brand-50) 100%
+  );
+  --gloss-card: linear-gradient(
+    180deg,
+    var(--surface-porcelain) 0%,
+    var(--surface-pearl) 100%
+  );
+  --gloss-slab-blue: radial-gradient(
+    88% 78% at 50% 18%,
+    var(--brand-500) 0%,
+    var(--brand-600) 56%,
+    var(--brand-800) 100%
+  );
+  --gloss-slab-ink: radial-gradient(
+    90% 82% at 50% 15%,
+    var(--brand-800) 0%,
+    var(--brand-950) 76%
+  );
+  --gloss-slab-pearl: linear-gradient(
+    180deg,
+    var(--surface-porcelain) 0%,
+    var(--surface-pearl) 55%,
+    var(--surface-mist) 100%
+  );
+  --gloss-sheen-white: linear-gradient(
+    105deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.58) 50%,
+    transparent 68%
+  );
+  --gloss-sheen-blue: linear-gradient(
+    105deg,
+    transparent 32%,
+    rgba(92, 225, 255, 0.32) 50%,
+    transparent 68%
+  );
+
+  /* 7. 3D Elevation & Specular Rim Shadows */
+  --shadow-cta-primary: inset 0 2px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -2px 0 rgba(5, 17, 61, 0.28),
+    0 16px 34px -6px rgba(14, 70, 245, 0.58),
+    0 4px 12px rgba(5, 17, 61, 0.24);
+  --shadow-cta-secondary: inset 0 2px 0 rgba(255, 255, 255, 1),
+    inset 0 -2px 0 rgba(14, 70, 245, 0.1),
+    0 16px 34px -6px rgba(5, 17, 61, 0.2),
+    0 4px 12px rgba(14, 70, 245, 0.14);
+  --shadow-gloss-card: inset 0 2px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 0 rgba(14, 70, 245, 0.08),
+    0 24px 52px -12px rgba(5, 17, 61, 0.18),
+    0 6px 16px -4px rgba(14, 70, 245, 0.1);
+  --shadow-gloss-card-hover: inset 0 2px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 0 rgba(14, 70, 245, 0.14),
+    0 32px 64px -12px rgba(14, 70, 245, 0.28),
+    0 10px 24px -4px rgba(5, 17, 61, 0.16);
+  --shadow-gloss-float: inset 0 2px 0 rgba(255, 255, 255, 0.95),
+    0 32px 68px -16px rgba(5, 17, 61, 0.38),
+    0 10px 24px -6px rgba(5, 17, 61, 0.22);
+  --shadow-gloss-slab: inset 0 2px 0 rgba(255, 255, 255, 0.32),
+    0 28px 64px -18px rgba(5, 17, 61, 0.35);
 }
 
 @theme inline {
+  /* Legacy Admin mappings */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -43,12 +161,134 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  /* Skilled4U Custom Brand Tokens */
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+  --color-brand-950: var(--brand-950);
+
+  /* Skilled4U Surface Tokens */
+  --color-surface-porcelain: var(--surface-porcelain);
+  --color-surface-pearl: var(--surface-pearl);
+  --color-surface-mist: var(--surface-mist);
+  --color-surface-frost: var(--surface-frost);
+  --color-surface-glass: var(--surface-glass);
+  --color-surface-glass-dark: var(--surface-glass-dark);
+
+  /* Skilled4U Accent & Ink Tokens */
+  --color-accent-sky: var(--accent-sky);
+  --color-accent-gold: var(--accent-gold);
+  --color-accent-success: var(--accent-success);
+  --color-ink-primary: var(--ink-primary);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-on-blue: var(--ink-on-blue);
+  --color-ink-on-blue-muted: var(--ink-on-blue-muted);
+
+  /* Skilled4U Radius Tokens */
+  --radius-card: var(--radius-card);
+  --radius-slab: var(--radius-slab);
+  --radius-pill: var(--radius-pill);
+
+  /* Skilled4U Shadow Tokens */
+  --shadow-cta-primary: var(--shadow-cta-primary);
+  --shadow-cta-secondary: var(--shadow-cta-secondary);
+  --shadow-gloss-card: var(--shadow-gloss-card);
+  --shadow-gloss-card-hover: var(--shadow-gloss-card-hover);
+  --shadow-gloss-float: var(--shadow-gloss-float);
+  --shadow-gloss-slab: var(--shadow-gloss-slab);
+
+  /* Skilled4U Font Tokens */
+  --font-display: var(--font-bricolage), var(--font-geist-sans), system-ui, sans-serif;
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  background: var(--surface-pearl);
+  color: var(--ink-primary);
+  font-family: var(--font-sans);
+}
+
+/* =========================================================================
+ * TOKENIZED SURFACE & GLOSS UTILITY CLASSES (Zero Hardcoded Values)
+ * ========================================================================= */
+
+.surface-slab-blue {
+  background: var(--gloss-slab-blue);
+  box-shadow: var(--shadow-gloss-slab);
+  color: var(--ink-on-blue);
+}
+
+.surface-slab-ink {
+  background: var(--gloss-slab-ink);
+  box-shadow: var(--shadow-gloss-slab);
+  color: var(--ink-on-blue);
+}
+
+.surface-slab-pearl {
+  background: var(--gloss-slab-pearl);
+  color: var(--ink-primary);
+}
+
+.surface-gloss-card {
+  background: var(--gloss-card);
+  border: 2px solid var(--surface-porcelain);
+  box-shadow: var(--shadow-gloss-card);
+  border-radius: var(--radius-card);
+}
+
+.surface-gloss-card:hover {
+  box-shadow: var(--shadow-gloss-card-hover);
+}
+
+.cta-surface-primary {
+  background: var(--gloss-primary-cta);
+  color: var(--ink-on-blue);
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  box-shadow: var(--shadow-cta-primary);
+}
+
+.cta-surface-secondary {
+  background: var(--gloss-secondary-cta);
+  color: var(--brand-600);
+  border: 2px solid var(--brand-200);
+  box-shadow: var(--shadow-cta-secondary);
+}
+
+.road-strip-surface {
+  background: linear-gradient(
+    180deg,
+    var(--brand-900) 0%,
+    var(--brand-950) 100%
+  );
+  border-top: 3px solid var(--brand-300);
+  border-bottom: 3px solid var(--brand-300);
+}
+
+/* High-contrast protective halo so text is never buried in background imagery */
+.contrast-halo-blue {
+  background: radial-gradient(
+    65% 60% at 50% 45%,
+    rgba(14, 70, 245, 0.94) 0%,
+    rgba(14, 70, 245, 0.78) 55%,
+    rgba(10, 41, 153, 0.35) 100%
+  );
+}
+
+.contrast-halo-pearl {
+  background: radial-gradient(
+    65% 60% at 50% 45%,
+    rgba(255, 255, 255, 0.96) 0%,
+    rgba(246, 249, 255, 0.88) 65%,
+    rgba(246, 249, 255, 0.5) 100%
+  );
 }

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import {
   TrendingUp,
@@ -30,9 +31,7 @@ import {
 } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
 
-export const dynamic = "force-dynamic";
-
-export default async function AdminOverviewPage() {
+async function OverviewMetricsAndTables() {
   const [allArtisans, allBookings, allPayments, allCategories] =
     await Promise.all([
       db.select().from(artisans).orderBy(desc(artisans.createdAt)),
@@ -58,26 +57,7 @@ export default async function AdminOverviewPage() {
   ).length;
 
   return (
-    <div className="space-y-8">
-      {/* Page Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-950">
-            Marketplace Operations &amp; Analytics
-          </h1>
-          <p className="text-sm text-zinc-500">
-            Real-time metrics queried via Drizzle ORM from your Neon PostgreSQL
-            database.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Link href="/admin/payments">
-            <Button size="sm">Manage Bachs.io Escrow</Button>
-          </Link>
-        </div>
-      </div>
-
+    <>
       {/* KPI Stat Cards */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -291,6 +271,41 @@ export default async function AdminOverviewPage() {
           </CardContent>
         </Card>
       </div>
+    </>
+  );
+}
+
+export default function AdminOverviewPage() {
+  return (
+    <div className="space-y-8">
+      {/* Page Title */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-950">
+            Marketplace Operations &amp; Analytics
+          </h1>
+          <p className="text-sm text-zinc-500">
+            Real-time metrics queried via Drizzle ORM from your Neon PostgreSQL
+            database.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Link href="/admin/payments">
+            <Button size="sm">Manage Bachs.io Escrow</Button>
+          </Link>
+        </div>
+      </div>
+
+      <Suspense
+        fallback={
+          <div className="rounded-2xl border border-zinc-200 bg-white p-8 text-sm text-zinc-500">
+            Loading marketplace operations &amp; analytics...
+          </div>
+        }
+      >
+        <OverviewMetricsAndTables />
+      </Suspense>
     </div>
   );
 }

@@ -1,16 +1,19 @@
+import { Suspense } from "react";
 import { db } from "@/db";
 import { payments } from "@/db/schema";
 import { desc } from "drizzle-orm";
 import { PaymentsManager } from "@/components/admin/payments-manager";
 
-export const dynamic = "force-dynamic";
-
-export default async function AdminPaymentsPage() {
+async function PaymentsContent() {
   const rows = await db
     .select()
     .from(payments)
     .orderBy(desc(payments.createdAt));
 
+  return <PaymentsManager initialPayments={rows} />;
+}
+
+export default function AdminPaymentsPage() {
   return (
     <div className="space-y-6">
       <div>
@@ -23,7 +26,15 @@ export default async function AdminPaymentsPage() {
         </p>
       </div>
 
-      <PaymentsManager initialPayments={rows} />
+      <Suspense
+        fallback={
+          <div className="rounded-2xl border border-zinc-200 bg-white p-8 text-sm text-zinc-500">
+            Loading Bachs.io escrow ledger...
+          </div>
+        }
+      >
+        <PaymentsContent />
+      </Suspense>
     </div>
   );
 }

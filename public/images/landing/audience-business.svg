@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 560" fill="none">
+    
+  <defs>
+    <linearGradient id="bgPearl" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F6F9FF"/>
+      <stop offset="55%" stop-color="#EDF3FF"/>
+      <stop offset="100%" stop-color="#DBE8FF"/>
+    </linearGradient>
+    <radialGradient id="bgCobalt" cx="50%" cy="25%" r="80%">
+      <stop offset="0%" stop-color="#478BFF"/>
+      <stop offset="50%" stop-color="#0E46F5"/>
+      <stop offset="100%" stop-color="#05113D"/>
+    </radialGradient>
+    <linearGradient id="porcelain" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="70%" stop-color="#F6F9FF"/>
+      <stop offset="100%" stop-color="#DBE8FF"/>
+    </linearGradient>
+    <linearGradient id="cobaltGloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5CE1FF"/>
+      <stop offset="25%" stop-color="#478BFF"/>
+      <stop offset="75%" stop-color="#0E46F5"/>
+      <stop offset="100%" stop-color="#0A2999"/>
+    </linearGradient>
+    <linearGradient id="goldGloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFE082"/>
+      <stop offset="50%" stop-color="#FFB800"/>
+      <stop offset="100%" stop-color="#CC8800"/>
+    </linearGradient>
+    <linearGradient id="skinWarm" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8D5538"/>
+      <stop offset="55%" stop-color="#6E3D23"/>
+      <stop offset="100%" stop-color="#4E2916"/>
+    </linearGradient>
+    <filter id="drop3d" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#05113D" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0E46F5" flood-opacity="0.15"/>
+    </filter>
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+    <rect width="640" height="560" fill="url(#bgPearl)"/>
+    <circle cx="320" cy="280" r="220" fill="#FFFFFF" opacity="0.85"/>
+    <g filter="url(#drop3d)">
+      <!-- 3D Styled Abuja Facility Manager / Business Partner -->
+      <path d="M145 560 C145 425 215 380 320 380 C425 380 495 425 495 560 Z" fill="url(#bgCobalt)"/>
+      <path d="M275 380 L320 495 L365 380 Z" fill="url(#porcelain)"/>
+      <rect x="292" y="315" width="56" height="80" rx="26" fill="url(#skinWarm)"/>
+      <circle cx="320" cy="175" r="84" fill="#121829"/>
+      <rect x="238" y="175" width="164" height="180" rx="80" fill="url(#skinWarm)"/>
+      <!-- Stylish Glasses -->
+      <rect x="256" y="232" width="56" height="40" rx="14" stroke="#FFFFFF" stroke-width="6" fill="#0E46F5" fill-opacity="0.15"/>
+      <rect x="328" y="232" width="56" height="40" rx="14" stroke="#FFFFFF" stroke-width="6" fill="#0E46F5" fill-opacity="0.15"/>
+      <line x1="312" y1="250" x2="328" y2="250" stroke="#FFFFFF" stroke-width="6"/>
+      <circle cx="286" cy="252" r="9" fill="#05113D"/>
+      <circle cx="354" cy="252" r="9" fill="#05113D"/>
+      <path d="M286 304 Q320 334 354 304 Z" fill="#FFFFFF"/>
+      <!-- Glossy Dashboard Tablet -->
+      <rect x="395" y="325" width="165" height="195" rx="24" fill="url(#porcelain)" stroke="#0E46F5" stroke-width="5"/>
+      <rect x="415" y="350" width="125" height="28" rx="10" fill="url(#cobaltGloss)"/>
+      <rect x="415" y="392" width="58" height="58" rx="12" fill="#EDF3FF"/>
+      <rect x="482" y="392" width="58" height="58" rx="12" fill="#EDF3FF"/>
+    </g>
+  </svg>

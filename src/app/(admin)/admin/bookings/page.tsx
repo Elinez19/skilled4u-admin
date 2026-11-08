@@ -3,8 +3,6 @@ import { bookings } from "@/db/schema";
 import { desc } from "drizzle-orm";
 import { BookingsManager } from "@/components/admin/bookings-manager";
 
-export const dynamic = "force-dynamic";
-
 export default async function AdminBookingsPage() {
   const rows = await db
     .select()

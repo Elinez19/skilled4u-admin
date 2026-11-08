@@ -1,13 +1,16 @@
+import { Suspense } from "react";
 import { db } from "@/db";
 import { artisans } from "@/db/schema";
 import { desc } from "drizzle-orm";
 import { ArtisansManager } from "@/components/admin/artisans-manager";
 
-export const dynamic = "force-dynamic";
-
-export default async function AdminArtisansPage() {
+async function ArtisansContent() {
   const rows = await db.select().from(artisans).orderBy(desc(artisans.rating));
 
+  return <ArtisansManager initialArtisans={rows} />;
+}
+
+export default function AdminArtisansPage() {
   return (
     <div className="space-y-6">
       <div>
@@ -20,7 +23,15 @@ export default async function AdminArtisansPage() {
         </p>
       </div>
 
-      <ArtisansManager initialArtisans={rows} />
+      <Suspense
+        fallback={
+          <div className="rounded-2xl border border-zinc-200 bg-white p-8 text-sm text-zinc-500">
+            Loading artisans &amp; KYC records...
+          </div>
+        }
+      >
+        <ArtisansContent />
+      </Suspense>
     </div>
   );
 }

@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+
+const bricolageDisplay = Bricolage_Grotesque({
+  variable: "--font-bricolage",
+  subsets: ["latin"],
+  weight: ["700", "800"],
+});
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,9 +19,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "skilled4U — Hire Verified Artisans & Skilled Professionals",
+  title: "skilled4U — Book Verified Skilled Artisans in Minutes",
   description:
-    "Connect with background-checked plumbers, electricians, carpenters, AC technicians, and cleaners across Nigeria. Backed by Bachs.io escrow protection.",
+    "Connect with top-rated plumbers, electricians, carpenters, AC technicians, and cleaners across Abuja and Nigeria in minutes.",
 };
 
 export default function RootLayout({
@@ -26,9 +32,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${bricolageDisplay.variable} ${geistSans.variable} ${geistMono.variable} h-full antialiased scroll-smooth`}
     >
-      <body className="min-h-full flex flex-col bg-white text-zinc-900">
+      <body className="min-h-full flex flex-col bg-surface-pearl text-ink-primary">
         {children}
       </body>
     </html>

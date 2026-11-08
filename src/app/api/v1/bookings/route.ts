@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { connection } from "next/server";
 import { db } from "@/db";
 import { bookings } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 
 export async function GET() {
+  await connection();
   try {
     const rows = await db
       .select()

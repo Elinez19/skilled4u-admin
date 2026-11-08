@@ -3,8 +3,6 @@ import { categories } from "@/db/schema";
 import { asc } from "drizzle-orm";
 import { CategoriesManager } from "@/components/admin/categories-manager";
 
-export const dynamic = "force-dynamic";
-
 export default async function AdminCategoriesPage() {
   const rows = await db
     .select()

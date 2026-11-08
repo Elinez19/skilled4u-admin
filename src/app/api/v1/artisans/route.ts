@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, connection } from "next/server";
 import { db } from "@/db";
 import { artisans } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
+  await connection();
   try {
     const { searchParams } = new URL(req.url);
     const kycStatus = searchParams.get("kycStatus");

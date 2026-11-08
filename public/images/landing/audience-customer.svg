@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 560" fill="none">
+    
+  <defs>
+    <linearGradient id="bgPearl" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F6F9FF"/>
+      <stop offset="55%" stop-color="#EDF3FF"/>
+      <stop offset="100%" stop-color="#DBE8FF"/>
+    </linearGradient>
+    <radialGradient id="bgCobalt" cx="50%" cy="25%" r="80%">
+      <stop offset="0%" stop-color="#478BFF"/>
+      <stop offset="50%" stop-color="#0E46F5"/>
+      <stop offset="100%" stop-color="#05113D"/>
+    </radialGradient>
+    <linearGradient id="porcelain" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="70%" stop-color="#F6F9FF"/>
+      <stop offset="100%" stop-color="#DBE8FF"/>
+    </linearGradient>
+    <linearGradient id="cobaltGloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5CE1FF"/>
+      <stop offset="25%" stop-color="#478BFF"/>
+      <stop offset="75%" stop-color="#0E46F5"/>
+      <stop offset="100%" stop-color="#0A2999"/>
+    </linearGradient>
+    <linearGradient id="goldGloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFE082"/>
+      <stop offset="50%" stop-color="#FFB800"/>
+      <stop offset="100%" stop-color="#CC8800"/>
+    </linearGradient>
+    <linearGradient id="skinWarm" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8D5538"/>
+      <stop offset="55%" stop-color="#6E3D23"/>
+      <stop offset="100%" stop-color="#4E2916"/>
+    </linearGradient>
+    <filter id="drop3d" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#05113D" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0E46F5" flood-opacity="0.15"/>
+    </filter>
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+    <rect width="640" height="560" fill="url(#bgPearl)"/>
+    <circle cx="320" cy="280" r="220" fill="#FFFFFF" opacity="0.85"/>
+    <circle cx="500" cy="120" r="90" fill="#5CE1FF" opacity="0.22"/>
+    <g filter="url(#drop3d)">
+      <!-- 3D Styled Happy Nigerian Homeowner Holding Smartphone -->
+      <!-- Shoulders / Cobalt Glossy Top -->
+      <path d="M150 560 C150 430 220 385 320 385 C420 385 490 430 490 560 Z" fill="url(#cobaltGloss)"/>
+      <path d="M265 385 L320 445 L375 385" fill="url(#porcelain)"/>
+      <!-- Neck & Head -->
+      <rect x="292" y="320" width="56" height="80" rx="26" fill="url(#skinWarm)"/>
+      <!-- Afro Puff Hair -->
+      <circle cx="235" cy="185" r="56" fill="#121829"/>
+      <circle cx="405" cy="185" r="56" fill="#121829"/>
+      <circle cx="320" cy="170" r="88" fill="#121829"/>
+      <!-- Face -->
+      <rect x="238" y="175" width="164" height="182" rx="82" fill="url(#skinWarm)"/>
+      <!-- Big Expressive Eyes -->
+      <ellipse cx="286" cy="252" rx="20" ry="22" fill="#FFFFFF"/>
+      <circle cx="290" cy="252" r="11" fill="#05113D"/>
+      <circle cx="294" cy="247" r="4" fill="#FFFFFF"/>
+      <ellipse cx="354" cy="252" rx="20" ry="22" fill="#FFFFFF"/>
+      <circle cx="350" cy="252" r="11" fill="#05113D"/>
+      <circle cx="354" cy="247" r="4" fill="#FFFFFF"/>
+      <!-- Brows & Joyful Smile -->
+      <path d="M264 220 Q286 208 306 220" stroke="#121829" stroke-width="7" stroke-linecap="round"/>
+      <path d="M334 220 Q354 208 376 220" stroke="#121829" stroke-width="7" stroke-linecap="round"/>
+      <path d="M284 300 Q320 334 356 300 Z" fill="#FFFFFF"/>
+      <!-- Glossy Smartphone in Hand -->
+      <g transform="translate(415 285) rotate(10)">
+        <rect x="0" y="0" width="110" height="190" rx="24" fill="url(#porcelain)" stroke="#0E46F5" stroke-width="6"/>
+        <rect x="12" y="16" width="86" height="158" rx="16" fill="url(#cobaltGloss)"/>
+        <circle cx="55" cy="95" r="24" fill="#00C47E"/>
+        <path d="M44 95 L52 103 L68 87" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </g>
+  </svg>
