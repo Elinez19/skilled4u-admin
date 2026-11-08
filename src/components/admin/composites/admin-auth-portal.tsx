@@ -147,8 +147,8 @@ export function AdminAuthPortal() {
 
             <AnimatedText
               as="h1"
-              text="Skilled4U Admin Portal"
-              highlightWords={["Operations", "Command."]}
+              text="Skilled4U Admin Portal."
+              highlightWords={["Admin", "Portal"]}
               highlightClassName="text-accent-sky"
               className="text-3xl sm:text-4xl lg:text-[42px] font-extrabold leading-[1.02] tracking-tight text-ink-on-blue drop-shadow-sm"
             />
