@@ -3,14 +3,22 @@
 import * as React from "react";
 import {
   CheckCircle2,
+  Clock,
   Landmark,
+  Pencil,
+  Plus,
+  Power,
+  Save,
   ShieldCheck,
   Star,
+  Trash2,
   UserCheck,
+  UserPlus,
   Users,
   XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { AdminActionMenu } from "@/components/admin/ui/admin-action-menu";
 import {
   AdminDataTable,
   AdminEmptyState,
@@ -21,7 +29,12 @@ import {
   AdminTableHeader,
   AdminTableRow,
 } from "@/components/admin/ui/admin-data-table";
-import { AdminSearchInput } from "@/components/admin/ui/admin-form-controls";
+import {
+  AdminInlineForm,
+  AdminSearchInput,
+  AdminSelectPills,
+  AdminTextField,
+} from "@/components/admin/ui/admin-form-controls";
 import {
   AdminHeroBanner,
   AdminWorkspaceSlab,
@@ -43,6 +56,8 @@ type UserViewFilter =
   | "artisans_verified"
   | "customers"
   | "admins";
+
+type FormUserGroup = "artisan" | "customer" | "admin";
 
 interface CustomerRecord {
   id: string;
@@ -114,7 +129,8 @@ const INITIAL_ADMINS: AdminRecord[] = [
     name: "Elijah Admin",
     email: "admin@skilled4u.ng",
     roleTitle: "Super Administrator",
-    permissions: "Full access: Users, Bookings, Financials, Disputes & Settings",
+    permissions:
+      "Full access: Users, Bookings, Financials, Disputes & Settings",
     status: "verified",
     lastActive: "Online now",
   },
@@ -123,7 +139,8 @@ const INITIAL_ADMINS: AdminRecord[] = [
     name: "Funke Oladipo",
     email: "trust@skilled4u.ng",
     roleTitle: "KYC & Dispute Moderator",
-    permissions: "Artisan identity verification, dispute claims & review moderation",
+    permissions:
+      "Artisan identity verification, dispute claims & review moderation",
     status: "verified",
     lastActive: "18 mins ago",
   },
@@ -132,11 +149,34 @@ const INITIAL_ADMINS: AdminRecord[] = [
     name: "Sadiq Abdullahi",
     email: "dispatch@skilled4u.ng",
     roleTitle: "Dispatch & Support Lead",
-    permissions: "Live booking dispatch, schedule updates & customer helpdesk",
+    permissions:
+      "Live booking dispatch, schedule updates & customer helpdesk",
     status: "active",
     lastActive: "1 hour ago",
   },
 ];
+
+const USER_GROUP_OPTIONS = [
+  { id: "artisan", label: "Artisan Pro" },
+  { id: "customer", label: "Customer" },
+  { id: "admin", label: "Administrator" },
+] as const;
+
+const ARTISAN_KYC_OPTIONS = [
+  { id: "verified", label: "Verified KYC" },
+  { id: "pending", label: "Pending KYC" },
+  { id: "rejected", label: "Rejected KYC" },
+] as const;
+
+const CUSTOMER_STATUS_OPTIONS = [
+  { id: "active", label: "Active Account" },
+  { id: "pending", label: "On Hold / Pending" },
+] as const;
+
+const ADMIN_STATUS_OPTIONS = [
+  { id: "verified", label: "Verified Admin" },
+  { id: "active", label: "Active Staff" },
+] as const;
 
 export function ArtisansKycWorkspace({
   initialArtisans,
@@ -144,30 +184,382 @@ export function ArtisansKycWorkspace({
   initialArtisans: ArtisanRow[];
 }) {
   const router = useRouter();
+  const formRef = React.useRef<HTMLDivElement>(null);
+
   const [items, setItems] = React.useState<ArtisanRow[]>(initialArtisans);
   const [customers, setCustomers] =
     React.useState<CustomerRecord[]>(INITIAL_CUSTOMERS);
-  const [admins] = React.useState<AdminRecord[]>(INITIAL_ADMINS);
+  const [admins, setAdmins] = React.useState<AdminRecord[]>(INITIAL_ADMINS);
   const [filter, setFilter] = React.useState<UserViewFilter>("artisans_all");
   const [search, setSearch] = React.useState("");
   const [busyId, setBusyId] = React.useState<string | null>(null);
 
-  async function updateArtisanKyc(id: string, kycStatus: string) {
+  // Inline Form State (replaces modal)
+  const [formOpen, setFormOpen] = React.useState(true);
+  const [formGroup, setFormGroup] = React.useState<FormUserGroup>("artisan");
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [saving, setSaving] = React.useState(false);
+  const [savedBanner, setSavedBanner] = React.useState<string | null>(null);
+
+  // Shared & role-specific form fields
+  const [name, setName] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [phone, setPhone] = React.useState("+234 803 550 1920");
+  const [city, setCity] = React.useState("Abuja (Wuse II)");
+
+  // Artisan-specific fields
+  const [trade, setTrade] = React.useState("AC & Refrigeration Specialist");
+  const [hourlyRateNumeric, setHourlyRateNumeric] = React.useState("15000");
+  const [ninNumber, setNinNumber] = React.useState("48192038471");
+  const [bankName, setBankName] = React.useState("Access Bank");
+  const [bankAccountNumber, setBankAccountNumber] =
+    React.useState("0148291042");
+  const [kycStatus, setKycStatus] = React.useState<
+    "verified" | "pending" | "rejected"
+  >("verified");
+
+  // Customer-specific fields
+  const [bookingsCount, setBookingsCount] = React.useState("1");
+  const [customerStatus, setCustomerStatus] = React.useState<
+    "active" | "pending"
+  >("active");
+
+  // Admin-specific fields
+  const [roleTitle, setRoleTitle] = React.useState("Operations Coordinator");
+  const [permissions, setPermissions] = React.useState(
+    "User verification, booking dispatch & escrow support"
+  );
+  const [adminStatus, setAdminStatus] = React.useState<"verified" | "active">(
+    "verified"
+  );
+
+  function notifySaved(msg: string) {
+    setSavedBanner(msg);
+    setTimeout(() => setSavedBanner(null), 3500);
+  }
+
+  function scrollToForm() {
+    setFormOpen(true);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+  }
+
+  function resetForm(nextGroup?: FormUserGroup) {
+    const targetGroup = nextGroup ?? formGroup;
+    setEditingId(null);
+    setFormGroup(targetGroup);
+    setName("");
+    setEmail("");
+    setPhone("+234 803 550 1920");
+    setCity("Abuja (Wuse II)");
+    setTrade("AC & Refrigeration Specialist");
+    setHourlyRateNumeric("15000");
+    setNinNumber("48192038471");
+    setBankName("Access Bank");
+    setBankAccountNumber("0148291042");
+    setKycStatus("verified");
+    setBookingsCount("1");
+    setCustomerStatus("active");
+    setRoleTitle("Operations Coordinator");
+    setPermissions("User verification, booking dispatch & escrow support");
+    setAdminStatus("verified");
+  }
+
+  function loadArtisanIntoForm(art: ArtisanRow) {
+    setFormGroup("artisan");
+    setEditingId(art.id);
+    setName(art.name);
+    setEmail(art.email);
+    setPhone(art.phone);
+    setCity(art.city);
+    setTrade(art.trade);
+    setHourlyRateNumeric(String(art.hourlyRateNumeric || 15000));
+    setNinNumber(art.ninNumber || "48192038471");
+    setBankName(art.bankName || "Access Bank");
+    setBankAccountNumber(art.bankAccountNumber || "0148291042");
+    setKycStatus(
+      (art.kycStatus as "verified" | "pending" | "rejected") || "pending"
+    );
+    scrollToForm();
+  }
+
+  function loadCustomerIntoForm(cust: CustomerRecord) {
+    setFormGroup("customer");
+    setEditingId(cust.id);
+    setName(cust.name);
+    setEmail(cust.email);
+    setPhone(cust.phone);
+    setCity(cust.city);
+    setBookingsCount(String(cust.bookingsCount));
+    setCustomerStatus(cust.status);
+    scrollToForm();
+  }
+
+  function loadAdminIntoForm(adm: AdminRecord) {
+    setFormGroup("admin");
+    setEditingId(adm.id);
+    setName(adm.name);
+    setEmail(adm.email);
+    setRoleTitle(adm.roleTitle);
+    setPermissions(adm.permissions);
+    setAdminStatus(adm.status);
+    scrollToForm();
+  }
+
+  async function handleFormSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      if (formGroup === "artisan") {
+        const rateNum = Number(hourlyRateNumeric) || 15000;
+        const formattedRate = `₦${rateNum.toLocaleString()}`;
+
+        if (editingId) {
+          const res = await fetch("/api/v1/artisans", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: editingId,
+              name,
+              email,
+              phone,
+              trade,
+              city,
+              hourlyRate: formattedRate,
+              hourlyRateNumeric: rateNum,
+              ninNumber,
+              bankName,
+              bankAccountNumber,
+              kycStatus,
+            }),
+          });
+          if (res.ok) {
+            const { data } = await res.json();
+            setItems((prev) =>
+              prev.map((a) => (a.id === editingId ? data : a))
+            );
+            router.refresh();
+          } else {
+            setItems((prev) =>
+              prev.map((a) =>
+                a.id === editingId
+                  ? {
+                      ...a,
+                      name,
+                      email,
+                      phone,
+                      trade,
+                      city,
+                      hourlyRate: formattedRate,
+                      hourlyRateNumeric: rateNum,
+                      ninNumber,
+                      bankName,
+                      bankAccountNumber,
+                      kycStatus,
+                    }
+                  : a
+              )
+            );
+          }
+          notifySaved(`Updated artisan ${name}`);
+          resetForm("artisan");
+        } else {
+          const res = await fetch("/api/v1/artisans", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name,
+              email,
+              phone,
+              trade,
+              city,
+              hourlyRate: formattedRate,
+              hourlyRateNumeric: rateNum,
+              ninNumber,
+              bankName,
+              bankAccountNumber,
+              kycStatus,
+            }),
+          });
+          if (res.ok) {
+            const { data } = await res.json();
+            setItems((prev) => [data, ...prev]);
+            router.refresh();
+          } else {
+            const fallbackArtisan: ArtisanRow = {
+              id: `art_${Date.now()}`,
+              userId: null,
+              name,
+              email: email || "pro@skilled4u.ng",
+              phone,
+              trade,
+              categoryId: null,
+              serviceKey: "general",
+              profileImage: "/images/landing/hero-artisan.png",
+              hourlyRate: formattedRate,
+              hourlyRateNumeric: rateNum,
+              about: `Verified ${trade} pro serving ${city}.`,
+              skills: [trade],
+              portfolioImages: [],
+              rating: 5.0,
+              reviewsCount: 1,
+              completedJobs: 1,
+              distance: "2.0 km",
+              city,
+              address: city,
+              latitude: 9.0765,
+              longitude: 7.3986,
+              isOnline: true,
+              kycStatus,
+              ninNumber,
+              bankName,
+              bankAccountNumber,
+              bankAccountName: name,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+            setItems((prev) => [fallbackArtisan, ...prev]);
+          }
+          notifySaved(`Added artisan ${name}`);
+          resetForm("artisan");
+        }
+      } else if (formGroup === "customer") {
+        if (editingId) {
+          setCustomers((prev) =>
+            prev.map((c) =>
+              c.id === editingId
+                ? {
+                    ...c,
+                    name,
+                    email,
+                    phone,
+                    city,
+                    bookingsCount: Number(bookingsCount) || 0,
+                    status: customerStatus,
+                  }
+                : c
+            )
+          );
+          notifySaved(`Updated customer ${name}`);
+        } else {
+          const newCustomer: CustomerRecord = {
+            id: `cust_${Date.now()}`,
+            name,
+            email,
+            phone,
+            city,
+            bookingsCount: Number(bookingsCount) || 0,
+            status: customerStatus,
+            joinedAt: "Just now",
+          };
+          setCustomers((prev) => [newCustomer, ...prev]);
+          setFilter("customers");
+          notifySaved(`Added customer ${name}`);
+        }
+        resetForm("customer");
+      } else {
+        if (editingId) {
+          setAdmins((prev) =>
+            prev.map((adm) =>
+              adm.id === editingId
+                ? {
+                    ...adm,
+                    name,
+                    email,
+                    roleTitle,
+                    permissions,
+                    status: adminStatus,
+                  }
+                : adm
+            )
+          );
+          notifySaved(`Updated admin ${name}`);
+        } else {
+          const newAdmin: AdminRecord = {
+            id: `adm_${Date.now()}`,
+            name,
+            email,
+            roleTitle,
+            permissions,
+            status: adminStatus,
+            lastActive: "Online now",
+          };
+          setAdmins((prev) => [newAdmin, ...prev]);
+          setFilter("admins");
+          notifySaved(`Added administrator ${name}`);
+        }
+        resetForm("admin");
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function updateArtisanKyc(id: string, nextKycStatus: string) {
     setBusyId(id);
     try {
       const res = await fetch("/api/v1/artisans", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, kycStatus }),
+        body: JSON.stringify({ id, kycStatus: nextKycStatus }),
       });
       if (res.ok) {
         const { data } = await res.json();
         setItems((prev) => prev.map((a) => (a.id === id ? data : a)));
         router.refresh();
+      } else {
+        setItems((prev) =>
+          prev.map((a) =>
+            a.id === id ? { ...a, kycStatus: nextKycStatus } : a
+          )
+        );
       }
+      notifySaved(`KYC status set to ${nextKycStatus}`);
     } finally {
       setBusyId(null);
     }
+  }
+
+  async function toggleArtisanOnline(art: ArtisanRow) {
+    setBusyId(art.id);
+    try {
+      const nextOnline = !art.isOnline;
+      const res = await fetch("/api/v1/artisans", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: art.id, isOnline: nextOnline }),
+      });
+      if (res.ok) {
+        const { data } = await res.json();
+        setItems((prev) => prev.map((a) => (a.id === art.id ? data : a)));
+      } else {
+        setItems((prev) =>
+          prev.map((a) =>
+            a.id === art.id ? { ...a, isOnline: nextOnline } : a
+          )
+        );
+      }
+      notifySaved(
+        `${art.name} marked ${!art.isOnline ? "Online" : "Offline"}`
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function deleteArtisan(id: string) {
+    setItems((prev) => prev.filter((a) => a.id !== id));
+    if (editingId === id) resetForm("artisan");
+    try {
+      await fetch(`/api/v1/artisans?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      router.refresh();
+    } catch {
+      // Optimistically removed
+    }
+    notifySaved("Artisan record removed");
   }
 
   function toggleCustomerStatus(id: string) {
@@ -178,6 +570,33 @@ export function ArtisansKycWorkspace({
           : c
       )
     );
+    notifySaved("Customer account status updated");
+  }
+
+  function deleteCustomer(id: string) {
+    setCustomers((prev) => prev.filter((c) => c.id !== id));
+    if (editingId === id) resetForm("customer");
+    notifySaved("Customer account removed");
+  }
+
+  function toggleAdminStatus(id: string) {
+    setAdmins((prev) =>
+      prev.map((adm) =>
+        adm.id === id
+          ? {
+              ...adm,
+              status: adm.status === "verified" ? "active" : "verified",
+            }
+          : adm
+      )
+    );
+    notifySaved("Administrator status updated");
+  }
+
+  function deleteAdmin(id: string) {
+    setAdmins((prev) => prev.filter((adm) => adm.id !== id));
+    if (editingId === id) resetForm("admin");
+    notifySaved("Administrator access revoked");
   }
 
   const counts = React.useMemo(
@@ -230,23 +649,33 @@ export function ArtisansKycWorkspace({
   );
 
   return (
-    <div className="space-y-2 sm:space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <AdminHeroBanner
         eyebrow="Customers · Artisans · Administrators"
         eyebrowIcon="shield"
         headline="User Management & Verification Desk."
         highlightWords={["User", "Management", "Verification"]}
-        subtitle="Manage customer accounts and booking histories, verify artisan identity and bank payout credentials, and oversee administrator roles and permissions."
+        subtitle="Add, edit, and manage customer accounts, verify artisan identity and bank payout credentials, and configure administrator roles using the inline form below."
         primaryCta={{
-          label: "View Bookings Dispatch",
-          href: "/admin/bookings",
+          label: "Add New User",
+          onClick: () => {
+            resetForm(
+              filter === "customers"
+                ? "customer"
+                : filter === "admins"
+                  ? "admin"
+                  : "artisan"
+            );
+            scrollToForm();
+          },
           variant: "primary",
-          trailingArrow: true,
+          icon: <UserPlus className="h-4 w-4" />,
         }}
         secondaryCta={{
-          label: "Public Artisans Directory",
-          href: "/artisans",
+          label: "View Bookings Dispatch",
+          href: "/admin/bookings",
           variant: "secondary",
+          trailingArrow: true,
         }}
       />
 
@@ -291,6 +720,259 @@ export function ArtisansKycWorkspace({
           </StaggerItem>
         </Stagger>
 
+        {/* Inline Form to Add, Edit, and Manage Users (Artisans, Customers, Admins) */}
+        <div className="mt-6">
+          <AdminInlineForm
+            formRef={formRef}
+            eyebrow="Inline User Management Form"
+            title={
+              editingId
+                ? `Edit & Manage ${
+                    formGroup === "artisan"
+                      ? "Artisan Pro"
+                      : formGroup === "customer"
+                        ? "Customer Account"
+                        : "Administrator"
+                  }: ${name}`
+                : "Add, Edit & Manage Platform Users"
+            }
+            description="Create a new artisan, customer, or administrator account—or select any row from the table menu below to edit and manage credentials inline."
+            isEditing={Boolean(editingId)}
+            editingBadgeText={`Editing ${formGroup.toUpperCase()}`}
+            onResetToCreate={() => resetForm(formGroup)}
+            open={formOpen}
+            onOpenChange={setFormOpen}
+            savedMessage={savedBanner}
+          >
+            <form onSubmit={handleFormSubmit} className="space-y-4">
+              <AdminSelectPills
+                label="Select User Group"
+                options={USER_GROUP_OPTIONS}
+                value={formGroup}
+                onChange={(val) => {
+                  setEditingId(null);
+                  setFormGroup(val);
+                }}
+                columns={3}
+              />
+
+              {formGroup === "artisan" && (
+                <>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <AdminTextField
+                      label="Artisan Full Name"
+                      placeholder="e.g. Chukwuma Nwankwo"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                    />
+                    <AdminTextField
+                      label="Email Address"
+                      type="email"
+                      placeholder="pro@skilled4u.ng"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                    <AdminTextField
+                      label="Phone Number"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      required
+                    />
+                    <AdminTextField
+                      label="City & Dispatch Zone"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                    <AdminTextField
+                      label="Trade / Specialty"
+                      value={trade}
+                      onChange={(e) => setTrade(e.target.value)}
+                      required
+                    />
+                    <AdminTextField
+                      label="Hourly Rate (NGN)"
+                      type="number"
+                      min={1000}
+                      value={hourlyRateNumeric}
+                      onChange={(e) => setHourlyRateNumeric(e.target.value)}
+                      required
+                    />
+                    <AdminTextField
+                      label="NIN Verification Number"
+                      value={ninNumber}
+                      onChange={(e) => setNinNumber(e.target.value)}
+                      required
+                    />
+                    <AdminTextField
+                      label="Settlement Bank Name"
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
+                      required
+                    />
+                    <AdminTextField
+                      label="NUBAN Account Number"
+                      value={bankAccountNumber}
+                      onChange={(e) => setBankAccountNumber(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <AdminSelectPills
+                    label="KYC Verification Status"
+                    options={ARTISAN_KYC_OPTIONS}
+                    value={kycStatus}
+                    onChange={setKycStatus}
+                    columns={3}
+                  />
+                </>
+              )}
+
+              {formGroup === "customer" && (
+                <>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <AdminTextField
+                      label="Customer Full Name"
+                      placeholder="e.g. Zainab Lawal"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                    />
+                    <AdminTextField
+                      label="Email Address"
+                      type="email"
+                      placeholder="customer@gmail.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                    <AdminTextField
+                      label="Phone Number"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      required
+                    />
+                    <AdminTextField
+                      label="City & Neighborhood"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <AdminTextField
+                      label="Completed Bookings Count"
+                      type="number"
+                      min={0}
+                      value={bookingsCount}
+                      onChange={(e) => setBookingsCount(e.target.value)}
+                      required
+                    />
+                    <AdminSelectPills
+                      label="Customer Account Standing"
+                      options={CUSTOMER_STATUS_OPTIONS}
+                      value={customerStatus}
+                      onChange={setCustomerStatus}
+                      columns={2}
+                    />
+                  </div>
+                </>
+              )}
+
+              {formGroup === "admin" && (
+                <>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <AdminTextField
+                      label="Administrator Full Name"
+                      placeholder="e.g. Kemi Adewale"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                    />
+                    <AdminTextField
+                      label="Official Email"
+                      type="email"
+                      placeholder="kemi@skilled4u.ng"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                    <AdminTextField
+                      label="Assigned Role Title"
+                      value={roleTitle}
+                      onChange={(e) => setRoleTitle(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <AdminTextField
+                      label="Management Permissions Scope"
+                      value={permissions}
+                      onChange={(e) => setPermissions(e.target.value)}
+                      required
+                    />
+                    <AdminSelectPills
+                      label="Admin Access Status"
+                      options={ADMIN_STATUS_OPTIONS}
+                      value={adminStatus}
+                      onChange={setAdminStatus}
+                      columns={2}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex flex-wrap items-center justify-end gap-3 pt-3 border-t border-surface-frost">
+                {editingId && (
+                  <CtaButton
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => resetForm(formGroup)}
+                  >
+                    Cancel Edit
+                  </CtaButton>
+                )}
+                <CtaButton
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={saving}
+                >
+                  {editingId ? (
+                    <>
+                      <Save className="h-4 w-4" />
+                      <span>{saving ? "Saving..." : "Update User Record"}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4" />
+                      <span>
+                        {saving
+                          ? "Creating..."
+                          : `Add ${
+                              formGroup === "artisan"
+                                ? "Artisan Pro"
+                                : formGroup === "customer"
+                                  ? "Customer"
+                                  : "Administrator"
+                            }`}
+                      </span>
+                    </>
+                  )}
+                </CtaButton>
+              </div>
+            </form>
+          </AdminInlineForm>
+        </div>
+
         {/* Filter & Search Bar */}
         <div className="mt-6 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
           <AdminSegmentedTabs
@@ -308,18 +990,31 @@ export function ArtisansKycWorkspace({
           />
         </div>
 
-        {/* Directory Table by Role */}
+        {/* Directory Table by Role with Three-Dots Action Button & Dropdown CTAs */}
         <div className="mt-4">
           {filter === "customers" ? (
             <AdminDataTable
               title="Customer Accounts Directory"
-              subtitle="Manage registered customers, monitor booking activity, and review account standing."
+              subtitle="Manage registered customers, monitor booking activity, and use the three-dots menu to edit or update standing."
               badge={`${filteredCustomers.length} Customers`}
+              headerAction={
+                <CtaButton
+                  variant="primary"
+                  size="xs"
+                  onClick={() => {
+                    resetForm("customer");
+                    scrollToForm();
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Add Customer</span>
+                </CtaButton>
+              }
             >
               {filteredCustomers.length === 0 ? (
                 <AdminEmptyState
                   title="No Matching Customers"
-                  description="Try clearing your search query to view all customer accounts."
+                  description="Try clearing your search query or add a new customer using the inline form above."
                   icon={<Users className="h-5 w-5 text-accent-sky" />}
                 />
               ) : (
@@ -332,7 +1027,7 @@ export function ArtisansKycWorkspace({
                       <AdminTableHead>Bookings</AdminTableHead>
                       <AdminTableHead>Status</AdminTableHead>
                       <AdminTableHead className="text-right">
-                        Account Action
+                        Actions
                       </AdminTableHead>
                     </AdminTableRow>
                   </AdminTableHeader>
@@ -370,15 +1065,44 @@ export function ArtisansKycWorkspace({
                           <AdminStatusPill status={cust.status} />
                         </AdminTableCell>
                         <AdminTableCell className="text-right whitespace-nowrap">
-                          <CtaButton
-                            variant="secondary"
-                            size="xs"
-                            onClick={() => toggleCustomerStatus(cust.id)}
-                          >
-                            {cust.status === "active"
-                              ? "Place on Hold"
-                              : "Activate Account"}
-                          </CtaButton>
+                          <AdminActionMenu
+                            label={`Manage ${cust.name}`}
+                            ariaLabel={`Actions for customer ${cust.name}`}
+                            items={[
+                              {
+                                id: "edit",
+                                label: "Edit Customer in Form",
+                                description: "Load into inline form above",
+                                icon: <Pencil className="h-3.5 w-3.5" />,
+                                variant: "primary",
+                                onClick: () => loadCustomerIntoForm(cust),
+                              },
+                              {
+                                id: "toggle-status",
+                                label:
+                                  cust.status === "active"
+                                    ? "Place Account on Hold"
+                                    : "Activate Account",
+                                description: "Toggle customer dispatch access",
+                                icon:
+                                  cust.status === "active" ? (
+                                    <Clock className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                  ),
+                                onClick: () => toggleCustomerStatus(cust.id),
+                              },
+                              {
+                                id: "delete",
+                                label: "Remove Customer",
+                                description: "Delete customer record",
+                                icon: <Trash2 className="h-3.5 w-3.5" />,
+                                variant: "danger",
+                                dividerBefore: true,
+                                onClick: () => deleteCustomer(cust.id),
+                              },
+                            ]}
+                          />
                         </AdminTableCell>
                       </AdminTableRow>
                     ))}
@@ -391,11 +1115,24 @@ export function ArtisansKycWorkspace({
               title="Administrator Roles & Access Control"
               subtitle="Manage internal admin team members responsible for user verification, dispatch, disputes, and support."
               badge={`${filteredAdmins.length} Admins`}
+              headerAction={
+                <CtaButton
+                  variant="primary"
+                  size="xs"
+                  onClick={() => {
+                    resetForm("admin");
+                    scrollToForm();
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Add Admin</span>
+                </CtaButton>
+              }
             >
               {filteredAdmins.length === 0 ? (
                 <AdminEmptyState
                   title="No Matching Administrators"
-                  description="Try clearing your search query to view all administrator accounts."
+                  description="Try clearing your search query or add an administrator in the inline form above."
                   icon={<ShieldCheck className="h-5 w-5 text-accent-sky" />}
                 />
               ) : (
@@ -407,6 +1144,9 @@ export function ArtisansKycWorkspace({
                       <AdminTableHead>Management Scope</AdminTableHead>
                       <AdminTableHead>Last Activity</AdminTableHead>
                       <AdminTableHead>Status</AdminTableHead>
+                      <AdminTableHead className="text-right">
+                        Actions
+                      </AdminTableHead>
                     </AdminTableRow>
                   </AdminTableHeader>
                   <AdminTableBody>
@@ -440,6 +1180,41 @@ export function ArtisansKycWorkspace({
                         <AdminTableCell>
                           <AdminStatusPill status={adm.status} />
                         </AdminTableCell>
+                        <AdminTableCell className="text-right whitespace-nowrap">
+                          <AdminActionMenu
+                            label={`Manage ${adm.name}`}
+                            ariaLabel={`Actions for administrator ${adm.name}`}
+                            items={[
+                              {
+                                id: "edit",
+                                label: "Edit Admin in Form",
+                                description: "Modify role & permissions scope",
+                                icon: <Pencil className="h-3.5 w-3.5" />,
+                                variant: "primary",
+                                onClick: () => loadAdminIntoForm(adm),
+                              },
+                              {
+                                id: "toggle-status",
+                                label:
+                                  adm.status === "verified"
+                                    ? "Set Active Staff Status"
+                                    : "Mark Verified Admin",
+                                description: "Update admin badge level",
+                                icon: <ShieldCheck className="h-3.5 w-3.5" />,
+                                onClick: () => toggleAdminStatus(adm.id),
+                              },
+                              {
+                                id: "delete",
+                                label: "Revoke Admin Access",
+                                description: "Remove administrator account",
+                                icon: <Trash2 className="h-3.5 w-3.5" />,
+                                variant: "danger",
+                                dividerBefore: true,
+                                onClick: () => deleteAdmin(adm.id),
+                              },
+                            ]}
+                          />
+                        </AdminTableCell>
                       </AdminTableRow>
                     ))}
                   </AdminTableBody>
@@ -449,8 +1224,21 @@ export function ArtisansKycWorkspace({
           ) : (
             <AdminDataTable
               title="Artisan Verification & Profile Directory"
-              subtitle="Review artisan trade credentials, verify identity records, and approve bank payout accounts."
+              subtitle="Review artisan trade credentials, verify identity records, and use the three-dots menu to edit or approve bank payout accounts."
               badge={`${filteredArtisans.length} Showing`}
+              headerAction={
+                <CtaButton
+                  variant="primary"
+                  size="xs"
+                  onClick={() => {
+                    resetForm("artisan");
+                    scrollToForm();
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Add Artisan Pro</span>
+                </CtaButton>
+              }
             >
               {filteredArtisans.length === 0 ? (
                 <AdminEmptyState
@@ -482,7 +1270,7 @@ export function ArtisansKycWorkspace({
                       <AdminTableHead>Rating &amp; Jobs</AdminTableHead>
                       <AdminTableHead>KYC Status</AdminTableHead>
                       <AdminTableHead className="text-right">
-                        Verification Actions
+                        Actions
                       </AdminTableHead>
                     </AdminTableRow>
                   </AdminTableHeader>
@@ -555,35 +1343,74 @@ export function ArtisansKycWorkspace({
                           <AdminStatusPill status={art.kycStatus} />
                         </AdminTableCell>
 
-                        <AdminTableCell className="text-right">
-                          <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
-                            {art.kycStatus !== "verified" && (
-                              <CtaButton
-                                variant="primary"
-                                size="xs"
-                                disabled={busyId === art.id}
-                                onClick={() =>
-                                  updateArtisanKyc(art.id, "verified")
-                                }
-                              >
-                                <CheckCircle2 className="h-3 w-3" />
-                                <span>Approve</span>
-                              </CtaButton>
-                            )}
-                            {art.kycStatus !== "rejected" && (
-                              <CtaButton
-                                variant="secondary"
-                                size="xs"
-                                disabled={busyId === art.id}
-                                onClick={() =>
-                                  updateArtisanKyc(art.id, "rejected")
-                                }
-                              >
-                                <XCircle className="h-3 w-3 text-accent-warm" />
-                                <span>Reject</span>
-                              </CtaButton>
-                            )}
-                          </div>
+                        <AdminTableCell className="text-right whitespace-nowrap">
+                          <AdminActionMenu
+                            label={`Manage ${art.name}`}
+                            ariaLabel={`Actions for artisan ${art.name}`}
+                            items={[
+                              {
+                                id: "edit",
+                                label: "Edit Artisan in Form",
+                                description: "Modify profile, rate & NUBAN",
+                                icon: <Pencil className="h-3.5 w-3.5" />,
+                                variant: "primary",
+                                onClick: () => loadArtisanIntoForm(art),
+                              },
+                              {
+                                id: "approve-kyc",
+                                label: "Approve & Verify KYC",
+                                description: "Authorize job dispatch & payouts",
+                                icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+                                disabled:
+                                  busyId === art.id ||
+                                  art.kycStatus === "verified",
+                                onClick: () =>
+                                  updateArtisanKyc(art.id, "verified"),
+                              },
+                              {
+                                id: "pending-kyc",
+                                label: "Mark KYC Pending",
+                                description: "Move to verification review queue",
+                                icon: <Clock className="h-3.5 w-3.5" />,
+                                disabled:
+                                  busyId === art.id ||
+                                  art.kycStatus === "pending",
+                                onClick: () =>
+                                  updateArtisanKyc(art.id, "pending"),
+                              },
+                              {
+                                id: "toggle-online",
+                                label: art.isOnline
+                                  ? "Set Dispatch Offline"
+                                  : "Set Dispatch Online",
+                                description: "Toggle live availability status",
+                                icon: <Power className="h-3.5 w-3.5" />,
+                                disabled: busyId === art.id,
+                                onClick: () => toggleArtisanOnline(art),
+                              },
+                              {
+                                id: "reject-kyc",
+                                label: "Reject KYC Credentials",
+                                description: "Flag NIN or bank mismatch",
+                                icon: <XCircle className="h-3.5 w-3.5" />,
+                                variant: "danger",
+                                dividerBefore: true,
+                                disabled:
+                                  busyId === art.id ||
+                                  art.kycStatus === "rejected",
+                                onClick: () =>
+                                  updateArtisanKyc(art.id, "rejected"),
+                              },
+                              {
+                                id: "delete",
+                                label: "Delete Artisan Record",
+                                description: "Remove artisan from directory",
+                                icon: <Trash2 className="h-3.5 w-3.5" />,
+                                variant: "danger",
+                                onClick: () => deleteArtisan(art.id),
+                              },
+                            ]}
+                          />
                         </AdminTableCell>
                       </AdminTableRow>
                     ))}
@@ -597,5 +1424,3 @@ export function ArtisansKycWorkspace({
     </div>
   );
 }
-
-

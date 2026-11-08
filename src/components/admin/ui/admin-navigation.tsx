@@ -7,12 +7,10 @@ import {
   CalendarCheck,
   ChevronRight,
   CreditCard,
-  ExternalLink,
   Headset,
   Layers,
   LayoutDashboard,
   Lock,
-  LogIn,
   LogOut,
   Menu,
   Scale,
@@ -309,29 +307,16 @@ function SidebarContent({
           </div>
         </div>
 
-        {/* Strictly 2 Custom CTAs for Public Website & Sign Out */}
-        <div className="grid grid-cols-2 gap-1.5">
-          <CtaButton
-            variant="secondary"
-            size="xs"
-            href="/"
-            onClick={onNavigate}
-            className="w-full px-2 text-[11px]"
-          >
-            <span>Public App</span>
-            <ExternalLink className="h-3 w-3" />
-          </CtaButton>
-
-          <CtaButton
-            variant="primary"
-            size="xs"
-            onClick={onSignOut}
-            className="w-full px-2 text-[11px]"
-          >
-            <LogOut className="h-3 w-3" />
-            <span>Sign Out</span>
-          </CtaButton>
-        </div>
+        {/* Sign Out Action */}
+        <CtaButton
+          variant="primary"
+          size="xs"
+          onClick={onSignOut}
+          className="w-full px-2 text-[11px]"
+        >
+          <LogOut className="h-3 w-3" />
+          <span>Sign Out</span>
+        </CtaButton>
       </div>
     </div>
   );
@@ -639,16 +624,6 @@ export function AdminDashboardNavbar({
                 )}
               </AnimatePresence>
             </div>
-
-            <CtaButton
-              variant="secondary"
-              size="xs"
-              href="/login"
-              className="hidden sm:inline-flex"
-            >
-              <LogIn className="h-3.5 w-3.5" />
-              <span>Admin Login</span>
-            </CtaButton>
 
             <CtaButton
               variant="primary"

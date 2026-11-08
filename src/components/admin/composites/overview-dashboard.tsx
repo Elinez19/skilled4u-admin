@@ -5,8 +5,12 @@ import {
   ArrowUpRight,
   CalendarCheck,
   CheckCircle2,
+  CreditCard,
   Layers,
   Lock,
+  Pencil,
+  Play,
+  Scale,
   ShieldAlert,
   TrendingUp,
   Users,
@@ -14,6 +18,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { AdminActionMenu } from "@/components/admin/ui/admin-action-menu";
 import {
   AdminDataTable,
   AdminEmptyState,
@@ -73,10 +78,27 @@ export interface OverviewDashboardProps {
 
 export function OverviewDashboard({
   artisans,
-  bookings,
+  bookings: initialBookings,
   payments,
   categories,
 }: OverviewDashboardProps) {
+  const [bookings, setBookings] = React.useState<BookingRow[]>(initialBookings);
+
+  async function updateBookingStatus(id: string, status: string) {
+    setBookings((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, status } : b))
+    );
+    try {
+      await fetch("/api/v1/bookings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status }),
+      });
+    } catch {
+      // Optimistically updated
+    }
+  }
+
   const totalGmv = payments.reduce((sum, p) => sum + p.amount, 0);
   const totalCommission = payments.reduce((sum, p) => sum + p.platformFee, 0);
   const escrowHeldAmount = payments
@@ -246,6 +268,9 @@ export function OverviewDashboard({
                       <AdminTableHead>Artisan Pro</AdminTableHead>
                       <AdminTableHead>Amount</AdminTableHead>
                       <AdminTableHead>Status</AdminTableHead>
+                      <AdminTableHead className="text-right">
+                        Actions
+                      </AdminTableHead>
                     </AdminTableRow>
                   </AdminTableHeader>
                   <AdminTableBody>
@@ -270,6 +295,64 @@ export function OverviewDashboard({
                         </AdminTableCell>
                         <AdminTableCell>
                           <AdminStatusPill status={bk.status} />
+                        </AdminTableCell>
+                        <AdminTableCell className="text-right whitespace-nowrap">
+                          <AdminActionMenu
+                            label={`Booking ${bk.bookingCode}`}
+                            ariaLabel={`Actions for booking ${bk.bookingCode}`}
+                            items={[
+                              {
+                                id: "manage",
+                                label: "Edit & Manage in Form",
+                                description: "Open in Bookings Console",
+                                icon: <Pencil className="h-3.5 w-3.5" />,
+                                variant: "primary",
+                                href: "/admin/bookings",
+                              },
+                              {
+                                id: "accept",
+                                label: "Accept Dispatch",
+                                description: "Confirm artisan assignment",
+                                icon: <CalendarCheck className="h-3.5 w-3.5" />,
+                                disabled: bk.status === "accepted",
+                                onClick: () =>
+                                  updateBookingStatus(bk.id, "accepted"),
+                              },
+                              {
+                                id: "in-progress",
+                                label: "Mark In Progress",
+                                description: "Artisan arrived on-site",
+                                icon: <Play className="h-3.5 w-3.5" />,
+                                disabled: bk.status === "in_progress",
+                                onClick: () =>
+                                  updateBookingStatus(bk.id, "in_progress"),
+                              },
+                              {
+                                id: "complete",
+                                label: "Complete Job",
+                                description: "Finalize service & sign-off",
+                                icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+                                disabled: bk.status === "completed",
+                                onClick: () =>
+                                  updateBookingStatus(bk.id, "completed"),
+                              },
+                              {
+                                id: "financials",
+                                label: "Open Financials & Escrow",
+                                description: "View payment settlement",
+                                icon: <CreditCard className="h-3.5 w-3.5" />,
+                                dividerBefore: true,
+                                href: "/admin/financials",
+                              },
+                              {
+                                id: "dispute",
+                                label: "Open Dispute Case",
+                                description: "Escalate to arbitration",
+                                icon: <Scale className="h-3.5 w-3.5" />,
+                                href: "/admin/disputes",
+                              },
+                            ]}
+                          />
                         </AdminTableCell>
                       </AdminTableRow>
                     ))}

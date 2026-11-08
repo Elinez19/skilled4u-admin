@@ -4,10 +4,15 @@ import * as React from "react";
 import {
   CheckCircle2,
   Lock,
+  Pencil,
+  Plus,
+  Save,
   Scale,
   ShieldAlert,
   ShieldCheck,
+  Trash2,
 } from "lucide-react";
+import { AdminActionMenu } from "@/components/admin/ui/admin-action-menu";
 import {
   AdminDataTable,
   AdminEmptyState,
@@ -18,7 +23,13 @@ import {
   AdminTableHeader,
   AdminTableRow,
 } from "@/components/admin/ui/admin-data-table";
-import { AdminSearchInput } from "@/components/admin/ui/admin-form-controls";
+import {
+  AdminInlineForm,
+  AdminSearchInput,
+  AdminSelectPills,
+  AdminTextareaField,
+  AdminTextField,
+} from "@/components/admin/ui/admin-form-controls";
 import {
   AdminHeroBanner,
   AdminWorkspaceSlab,
@@ -30,11 +41,11 @@ import {
 } from "@/components/admin/ui/admin-segmented-tabs";
 import { AdminStatusPill } from "@/components/admin/ui/admin-status-pill";
 import { CtaButton } from "@/components/landing/ui/cta-button";
-import { PillBadge } from "@/components/landing/ui/pill-badge";
 import { Stagger, StaggerItem } from "@/components/motion/reveal";
 import { formatCurrency } from "@/lib/utils";
 
 type DisputeFilter = "all" | "disputed" | "held" | "resolved";
+type DisputeStatus = "disputed" | "held" | "resolved";
 
 interface DisputeItem {
   id: string;
@@ -45,7 +56,7 @@ interface DisputeItem {
   serviceTitle: string;
   escrowAmount: number;
   reason: string;
-  status: "disputed" | "held" | "resolved";
+  status: DisputeStatus;
   createdAt: string;
 }
 
@@ -88,15 +99,126 @@ const INITIAL_DISPUTES: DisputeItem[] = [
   },
 ];
 
+const DISPUTE_STATUS_OPTIONS = [
+  { id: "disputed", label: "Active Dispute" },
+  { id: "held", label: "Escrow Frozen" },
+  { id: "resolved", label: "Resolved & Settled" },
+] as const;
+
 export default function AdminDisputesPage() {
+  const formRef = React.useRef<HTMLDivElement>(null);
+
   const [items, setItems] = React.useState<DisputeItem[]>(INITIAL_DISPUTES);
   const [filter, setFilter] = React.useState<DisputeFilter>("all");
   const [search, setSearch] = React.useState("");
 
-  function resolveDispute(id: string) {
+  // Inline Form State
+  const [formOpen, setFormOpen] = React.useState(true);
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [editingCaseCode, setEditingCaseCode] = React.useState<string | null>(
+    null
+  );
+  const [bookingCode, setBookingCode] = React.useState("S4U-8890");
+  const [clientName, setClientName] = React.useState("");
+  const [artisanName, setArtisanName] = React.useState("Emeka Okafor");
+  const [serviceTitle, setServiceTitle] = React.useState(
+    "Split A.C Servicing & Gas Refill"
+  );
+  const [escrowAmount, setEscrowAmount] = React.useState("25000");
+  const [status, setStatus] = React.useState<DisputeStatus>("disputed");
+  const [reason, setReason] = React.useState("");
+  const [savedBanner, setSavedBanner] = React.useState<string | null>(null);
+
+  function notifySaved(msg: string) {
+    setSavedBanner(msg);
+    setTimeout(() => setSavedBanner(null), 3500);
+  }
+
+  function scrollToForm() {
+    setFormOpen(true);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+  }
+
+  function resetForm() {
+    setEditingId(null);
+    setEditingCaseCode(null);
+    setBookingCode(`S4U-${8890 + items.length}`);
+    setClientName("");
+    setArtisanName("Emeka Okafor");
+    setServiceTitle("Split A.C Servicing & Gas Refill");
+    setEscrowAmount("25000");
+    setStatus("disputed");
+    setReason("");
+  }
+
+  function loadDisputeIntoForm(item: DisputeItem) {
+    setEditingId(item.id);
+    setEditingCaseCode(item.caseCode);
+    setBookingCode(item.bookingCode);
+    setClientName(item.clientName);
+    setArtisanName(item.artisanName);
+    setServiceTitle(item.serviceTitle);
+    setEscrowAmount(String(item.escrowAmount));
+    setStatus(item.status);
+    setReason(item.reason);
+    scrollToForm();
+  }
+
+  function handleSaveDispute(e: React.FormEvent) {
+    e.preventDefault();
+    if (editingId) {
+      setItems((prev) =>
+        prev.map((d) =>
+          d.id === editingId
+            ? {
+                ...d,
+                bookingCode,
+                clientName,
+                artisanName,
+                serviceTitle,
+                escrowAmount: Number(escrowAmount) || 0,
+                status,
+                reason,
+              }
+            : d
+        )
+      );
+      notifySaved(`Updated arbitration case ${editingCaseCode || editingId}`);
+      resetForm();
+    } else {
+      const nextNum = 9042 + items.length;
+      const code = `DSP-${nextNum}`;
+      const newCase: DisputeItem = {
+        id: `dsp_${nextNum}`,
+        caseCode: code,
+        bookingCode,
+        clientName,
+        artisanName,
+        serviceTitle,
+        escrowAmount: Number(escrowAmount) || 0,
+        status,
+        reason,
+        createdAt: "Just now",
+      };
+      setItems((prev) => [newCase, ...prev]);
+      notifySaved(`Opened dispute case ${code}`);
+      resetForm();
+    }
+  }
+
+  function updateDisputeStatus(id: string, nextStatus: DisputeStatus) {
     setItems((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, status: "resolved" } : d))
+      prev.map((d) => (d.id === id ? { ...d, status: nextStatus } : d))
     );
+    notifySaved(`Case status updated to ${nextStatus}`);
+  }
+
+  function deleteDispute(id: string) {
+    setItems((prev) => prev.filter((d) => d.id !== id));
+    if (editingId === id) resetForm();
+    notifySaved("Dispute case removed");
   }
 
   const openCount = items.filter((d) => d.status !== "resolved").length;
@@ -139,17 +261,21 @@ export default function AdminDisputesPage() {
         eyebrowIcon="shield"
         headline="Disputes & Escrow Resolution."
         highlightWords={["Disputes", "Escrow", "Resolution."]}
-        subtitle="Investigate service claims between customers and artisans, review job evidence, hold or release escrow funds, and authorize fair refunds or settlements."
+        subtitle="Open, edit, and arbitrate service claims between customers and artisans using the inline form below, or use the table three-dots action menu."
         primaryCta={{
-          label: "Open Financials Ledger",
-          href: "/admin/financials",
+          label: "Open Dispute Case",
+          onClick: () => {
+            resetForm();
+            scrollToForm();
+          },
           variant: "primary",
-          trailingArrow: true,
+          icon: <Plus className="h-4 w-4" />,
         }}
         secondaryCta={{
-          label: "Bookings Dispatch",
-          href: "/admin/bookings",
+          label: "Open Financials Ledger",
+          href: "/admin/financials",
           variant: "secondary",
+          trailingArrow: true,
         }}
       />
 
@@ -195,6 +321,107 @@ export default function AdminDisputesPage() {
           </StaggerItem>
         </Stagger>
 
+        {/* Inline Form to Add, Edit, and Arbitrate Disputes */}
+        <div className="mt-6">
+          <AdminInlineForm
+            formRef={formRef}
+            eyebrow="Inline Dispute Arbitration Form"
+            title={
+              editingId
+                ? `Edit & Arbitrate Case ${editingCaseCode || editingId}`
+                : "Open, Edit & Arbitrate Dispute Case"
+            }
+            description="Log a new customer or artisan claim, freeze escrow funds during investigation, or select any row from the table menu below to edit arbitration findings."
+            isEditing={Boolean(editingId)}
+            editingBadgeText={`Case ${editingCaseCode || ""}`}
+            onResetToCreate={resetForm}
+            open={formOpen}
+            onOpenChange={setFormOpen}
+            savedMessage={savedBanner}
+          >
+            <form onSubmit={handleSaveDispute} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                <AdminTextField
+                  label="Booking Reference"
+                  value={bookingCode}
+                  onChange={(e) => setBookingCode(e.target.value)}
+                  required
+                />
+                <AdminTextField
+                  label="Client Full Name"
+                  placeholder="e.g. Chidinma Nwosu"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  required
+                />
+                <AdminTextField
+                  label="Assigned Artisan Pro"
+                  value={artisanName}
+                  onChange={(e) => setArtisanName(e.target.value)}
+                  required
+                />
+                <AdminTextField
+                  label="Service Title"
+                  value={serviceTitle}
+                  onChange={(e) => setServiceTitle(e.target.value)}
+                  required
+                />
+                <AdminTextField
+                  label="Frozen Escrow (NGN)"
+                  type="number"
+                  min={1000}
+                  value={escrowAmount}
+                  onChange={(e) => setEscrowAmount(e.target.value)}
+                  required
+                />
+              </div>
+
+              <AdminSelectPills
+                label="Arbitration & Escrow State"
+                options={DISPUTE_STATUS_OPTIONS}
+                value={status}
+                onChange={setStatus}
+                columns={3}
+              />
+
+              <AdminTextareaField
+                label="Claim Reason & Arbitration Notes"
+                placeholder="Document the customer complaint, artisan inspection evidence, and settlement decision..."
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                required
+              />
+
+              <div className="flex flex-wrap items-center justify-end gap-3 pt-3 border-t border-surface-frost">
+                {editingId && (
+                  <CtaButton
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={resetForm}
+                  >
+                    Cancel Edit
+                  </CtaButton>
+                )}
+                <CtaButton type="submit" variant="primary" size="sm">
+                  {editingId ? (
+                    <>
+                      <Save className="h-4 w-4" />
+                      <span>Save Arbitration Decision</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4" />
+                      <span>Open Dispute &amp; Hold Escrow</span>
+                    </>
+                  )}
+                </CtaButton>
+              </div>
+            </form>
+          </AdminInlineForm>
+        </div>
+
         <div className="mt-6 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
           <AdminSegmentedTabs
             options={tabOptions}
@@ -211,11 +438,25 @@ export default function AdminDisputesPage() {
           />
         </div>
 
+        {/* Disputes Table with Three-Dots Action Button & Dropdown CTAs */}
         <div className="mt-4">
           <AdminDataTable
             title="Marketplace Dispute & Arbitration Queue"
-            subtitle="Review customer and artisan reports, mediate service quality claims, and authorize payout release or refund."
+            subtitle="Review customer and artisan reports, mediate service quality claims, and use the three-dots menu to edit or settle."
             badge={`${filtered.length} Showing`}
+            headerAction={
+              <CtaButton
+                variant="primary"
+                size="xs"
+                onClick={() => {
+                  resetForm();
+                  scrollToForm();
+                }}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Open Case</span>
+              </CtaButton>
+            }
           >
             {filtered.length === 0 ? (
               <AdminEmptyState
@@ -233,7 +474,7 @@ export default function AdminDisputesPage() {
                     <AdminTableHead>Frozen Escrow</AdminTableHead>
                     <AdminTableHead>Status</AdminTableHead>
                     <AdminTableHead className="text-right">
-                      Arbitration Action
+                      Actions
                     </AdminTableHead>
                   </AdminTableRow>
                 </AdminTableHeader>
@@ -284,23 +525,56 @@ export default function AdminDisputesPage() {
                       </AdminTableCell>
 
                       <AdminTableCell className="text-right whitespace-nowrap">
-                        {item.status !== "resolved" ? (
-                          <CtaButton
-                            variant="primary"
-                            size="xs"
-                            onClick={() => resolveDispute(item.id)}
-                          >
-                            <CheckCircle2 className="h-3 w-3" />
-                            <span>Resolve &amp; Settle</span>
-                          </CtaButton>
-                        ) : (
-                          <PillBadge
-                            tone="sky"
-                            className="px-2.5 py-0.5 text-[10px]"
-                          >
-                            Settled
-                          </PillBadge>
-                        )}
+                        <AdminActionMenu
+                          label={`Case ${item.caseCode}`}
+                          ariaLabel={`Actions for dispute case ${item.caseCode}`}
+                          items={[
+                            {
+                              id: "edit",
+                              label: "Edit & Arbitrate in Form",
+                              description: "Load case into inline form",
+                              icon: <Pencil className="h-3.5 w-3.5" />,
+                              variant: "primary",
+                              onClick: () => loadDisputeIntoForm(item),
+                            },
+                            {
+                              id: "resolve",
+                              label: "Resolve & Release Escrow",
+                              description: "Authorize settlement payout",
+                              icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+                              disabled: item.status === "resolved",
+                              onClick: () =>
+                                updateDisputeStatus(item.id, "resolved"),
+                            },
+                            {
+                              id: "freeze",
+                              label: "Freeze Escrow in Hold",
+                              description: "Lock funds pending inspection",
+                              icon: <Lock className="h-3.5 w-3.5" />,
+                              disabled: item.status === "held",
+                              onClick: () =>
+                                updateDisputeStatus(item.id, "held"),
+                            },
+                            {
+                              id: "dispute",
+                              label: "Flag Active Dispute",
+                              description: "Reopen arbitration review",
+                              icon: <Scale className="h-3.5 w-3.5" />,
+                              disabled: item.status === "disputed",
+                              onClick: () =>
+                                updateDisputeStatus(item.id, "disputed"),
+                            },
+                            {
+                              id: "delete",
+                              label: "Delete Case Record",
+                              description: "Remove from dispute ledger",
+                              icon: <Trash2 className="h-3.5 w-3.5" />,
+                              variant: "danger",
+                              dividerBefore: true,
+                              onClick: () => deleteDispute(item.id),
+                            },
+                          ]}
+                        />
                       </AdminTableCell>
                     </AdminTableRow>
                   ))}
@@ -313,4 +587,3 @@ export default function AdminDisputesPage() {
     </div>
   );
 }
-

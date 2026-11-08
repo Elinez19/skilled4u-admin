@@ -6,11 +6,18 @@ import {
   CalendarCheck,
   CheckCircle2,
   Clock,
+  Lock,
   MapPin,
+  Pencil,
+  Play,
   Plus,
+  Save,
+  Trash2,
   Wrench,
+  XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { AdminActionMenu } from "@/components/admin/ui/admin-action-menu";
 import {
   AdminDataTable,
   AdminEmptyState,
@@ -22,14 +29,15 @@ import {
   AdminTableRow,
 } from "@/components/admin/ui/admin-data-table";
 import {
+  AdminInlineForm,
   AdminSearchInput,
+  AdminSelectPills,
   AdminTextField,
 } from "@/components/admin/ui/admin-form-controls";
 import {
   AdminHeroBanner,
   AdminWorkspaceSlab,
 } from "@/components/admin/ui/admin-hero-banner";
-import { AdminModal } from "@/components/admin/ui/admin-modal";
 import {
   AdminSegmentedTabs,
   type AdminTabOption,
@@ -47,21 +55,41 @@ type BookingStatusFilter =
   | "in_progress"
   | "completed";
 
+const BOOKING_STATUS_OPTIONS = [
+  { id: "pending", label: "Pending" },
+  { id: "accepted", label: "Accepted" },
+  { id: "in_progress", label: "In Progress" },
+  { id: "completed", label: "Completed" },
+  { id: "cancelled", label: "Cancelled" },
+] as const;
+
+const PAYMENT_STATUS_OPTIONS = [
+  { id: "unpaid", label: "Unpaid" },
+  { id: "escrowed", label: "Escrowed" },
+  { id: "released", label: "Released" },
+  { id: "refunded", label: "Refunded" },
+] as const;
+
 export function BookingsDispatchWorkspace({
   initialBookings,
 }: {
   initialBookings: BookingRow[];
 }) {
   const router = useRouter();
+  const formRef = React.useRef<HTMLDivElement>(null);
+
   const [items, setItems] = React.useState<BookingRow[]>(initialBookings);
   const [statusFilter, setStatusFilter] =
     React.useState<BookingStatusFilter>("all");
   const [search, setSearch] = React.useState("");
   const [busyId, setBusyId] = React.useState<string | null>(null);
 
-  // New Dispatch Modal State
-  const [modalOpen, setModalOpen] = React.useState(false);
+  // Inline Form State (replaces modal)
+  const [formOpen, setFormOpen] = React.useState(true);
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [editingCode, setEditingCode] = React.useState<string | null>(null);
   const [clientName, setClientName] = React.useState("Amina Bello");
+  const [clientEmail, setClientEmail] = React.useState("amina.bello@gmail.com");
   const [clientPhone, setClientPhone] = React.useState("+234 809 332 1104");
   const [address, setAddress] = React.useState(
     "14 Adetokunbo Ademola Crescent, Wuse II, Abuja"
@@ -70,52 +98,202 @@ export function BookingsDispatchWorkspace({
     "Split AC Gas Refill & Servicing"
   );
   const [artisanName, setArtisanName] = React.useState("Emeka Okafor");
+  const [scheduledDate, setScheduledDate] = React.useState("2026-11-10");
+  const [scheduledTime, setScheduledTime] = React.useState("10:30 AM");
   const [agreedAmount, setAgreedAmount] = React.useState("18000");
-  const [creating, setCreating] = React.useState(false);
+  const [bookingStatus, setBookingStatus] = React.useState<
+    "pending" | "accepted" | "in_progress" | "completed" | "cancelled"
+  >("pending");
+  const [paymentStatus, setPaymentStatus] = React.useState<
+    "unpaid" | "escrowed" | "released" | "refunded"
+  >("escrowed");
+  const [saving, setSaving] = React.useState(false);
+  const [savedBanner, setSavedBanner] = React.useState<string | null>(null);
 
-  async function updateBookingStatus(id: string, status: string) {
+  function notifySaved(msg: string) {
+    setSavedBanner(msg);
+    setTimeout(() => setSavedBanner(null), 3500);
+  }
+
+  function scrollToForm() {
+    setFormOpen(true);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+  }
+
+  function resetForm() {
+    setEditingId(null);
+    setEditingCode(null);
+    setClientName("Amina Bello");
+    setClientEmail("amina.bello@gmail.com");
+    setClientPhone("+234 809 332 1104");
+    setAddress("14 Adetokunbo Ademola Crescent, Wuse II, Abuja");
+    setServiceTitle("Split AC Gas Refill & Servicing");
+    setArtisanName("Emeka Okafor");
+    setScheduledDate("2026-11-10");
+    setScheduledTime("10:30 AM");
+    setAgreedAmount("18000");
+    setBookingStatus("pending");
+    setPaymentStatus("escrowed");
+  }
+
+  function loadBookingIntoForm(bk: BookingRow) {
+    setEditingId(bk.id);
+    setEditingCode(bk.bookingCode);
+    setClientName(bk.clientName);
+    setClientEmail(bk.clientEmail || "client@skilled4u.ng");
+    setClientPhone(bk.clientPhone);
+    setAddress(bk.address);
+    setServiceTitle(bk.serviceTitle);
+    setArtisanName(bk.artisanName);
+    setScheduledDate(bk.scheduledDate);
+    setScheduledTime(bk.scheduledTime);
+    setAgreedAmount(String(bk.agreedAmount));
+    setBookingStatus(
+      (bk.status as
+        | "pending"
+        | "accepted"
+        | "in_progress"
+        | "completed"
+        | "cancelled") || "pending"
+    );
+    setPaymentStatus(
+      (bk.paymentStatus as "unpaid" | "escrowed" | "released" | "refunded") ||
+        "unpaid"
+    );
+    scrollToForm();
+  }
+
+  async function updateBookingFields(
+    id: string,
+    patch: { status?: string; paymentStatus?: string }
+  ) {
     setBusyId(id);
     try {
       const res = await fetch("/api/v1/bookings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status }),
+        body: JSON.stringify({ id, ...patch }),
       });
       if (res.ok) {
         const { data } = await res.json();
         setItems((prev) => prev.map((b) => (b.id === id ? data : b)));
         router.refresh();
+      } else {
+        setItems((prev) =>
+          prev.map((b) => (b.id === id ? { ...b, ...patch } : b))
+        );
       }
+      notifySaved("Booking dispatch updated");
     } finally {
       setBusyId(null);
     }
   }
 
-  async function handleCreateBooking(e: React.FormEvent) {
-    e.preventDefault();
-    setCreating(true);
+  async function deleteBooking(id: string) {
+    setItems((prev) => prev.filter((b) => b.id !== id));
+    if (editingId === id) resetForm();
     try {
-      const res = await fetch("/api/v1/bookings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      await fetch(`/api/v1/bookings?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      router.refresh();
+    } catch {
+      // Optimistically removed
+    }
+    notifySaved("Booking removed from queue");
+  }
+
+  async function handleSaveBooking(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      if (editingId) {
+        const payload = {
+          id: editingId,
           clientName,
+          clientEmail,
           clientPhone,
           address,
           serviceTitle,
-          artisanId: "emeka-okafor",
           artisanName,
+          scheduledDate,
+          scheduledTime,
           agreedAmount: Number(agreedAmount),
-        }),
-      });
-      if (res.ok) {
-        const { data } = await res.json();
-        setItems((prev) => [data, ...prev]);
-        setModalOpen(false);
-        router.refresh();
+          status: bookingStatus,
+          paymentStatus,
+        };
+        const res = await fetch("/api/v1/bookings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          const { data } = await res.json();
+          setItems((prev) => prev.map((b) => (b.id === editingId ? data : b)));
+          router.refresh();
+        } else {
+          setItems((prev) =>
+            prev.map((b) =>
+              b.id === editingId ? { ...b, ...payload } : b
+            )
+          );
+        }
+        notifySaved(`Updated booking ${editingCode || editingId}`);
+        resetForm();
+      } else {
+        const res = await fetch("/api/v1/bookings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clientName,
+            clientEmail,
+            clientPhone,
+            address,
+            serviceTitle,
+            artisanId: "emeka-okafor",
+            artisanName,
+            scheduledDate,
+            scheduledTime,
+            agreedAmount: Number(agreedAmount),
+            status: bookingStatus,
+            paymentStatus,
+          }),
+        });
+        if (res.ok) {
+          const { data } = await res.json();
+          setItems((prev) => [data, ...prev]);
+          router.refresh();
+        } else {
+          const fallbackBooking: BookingRow = {
+            id: `bk_${Date.now()}`,
+            bookingCode: `S4U-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+            clientId: null,
+            clientName,
+            clientEmail,
+            clientPhone,
+            artisanId: "emeka-okafor",
+            artisanName,
+            categoryId: null,
+            serviceTitle,
+            description: serviceTitle,
+            status: bookingStatus,
+            scheduledDate,
+            scheduledTime,
+            address,
+            agreedAmount: Number(agreedAmount),
+            paymentStatus,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          setItems((prev) => [fallbackBooking, ...prev]);
+        }
+        notifySaved(`Dispatched new booking for ${clientName}`);
+        resetForm();
       }
     } finally {
-      setCreating(false);
+      setSaving(false);
     }
   }
 
@@ -156,16 +334,19 @@ export function BookingsDispatchWorkspace({
   });
 
   return (
-    <div className="space-y-2 sm:space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <AdminHeroBanner
         eyebrow="Service Scheduling & Live Dispatch"
         eyebrowIcon="pin"
         headline="Bookings & Dispatch Management."
         highlightWords={["Bookings", "Dispatch", "Management."]}
-        subtitle="Track incoming customer service requests, assign qualified artisans to jobs, manage appointment schedules, and advance bookings from acceptance to completion."
+        subtitle="Add, edit, and manage customer service bookings using the inline form below, assign verified artisans, and advance dispatch states from the table action menu."
         primaryCta={{
           label: "New Dispatch Booking",
-          onClick: () => setModalOpen(true),
+          onClick: () => {
+            resetForm();
+            scrollToForm();
+          },
           variant: "primary",
           icon: <Plus className="h-4 w-4" />,
         }}
@@ -178,8 +359,145 @@ export function BookingsDispatchWorkspace({
       />
 
       <AdminWorkspaceSlab tone="pearl" withPearlAsset>
+        {/* Inline Form to Add, Edit & Manage Bookings (replaces modal) */}
+        <AdminInlineForm
+          formRef={formRef}
+          eyebrow="Inline Booking & Dispatch Form"
+          title={
+            editingId
+              ? `Edit & Manage Booking ${editingCode || editingId}`
+              : "Create & Manage Service Booking"
+          }
+          description="Schedule a new customer service request, assign a verified artisan, or edit an existing dispatch selected from the table below."
+          isEditing={Boolean(editingId)}
+          editingBadgeText={`Booking ${editingCode || ""}`}
+          onResetToCreate={resetForm}
+          open={formOpen}
+          onOpenChange={setFormOpen}
+          savedMessage={savedBanner}
+        >
+          <form onSubmit={handleSaveBooking} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <AdminTextField
+                label="Client Full Name"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                required
+              />
+              <AdminTextField
+                label="Client Email"
+                type="email"
+                value={clientEmail}
+                onChange={(e) => setClientEmail(e.target.value)}
+                required
+              />
+              <AdminTextField
+                label="Client Phone"
+                value={clientPhone}
+                onChange={(e) => setClientPhone(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <AdminTextField
+                label="Requested Service"
+                value={serviceTitle}
+                onChange={(e) => setServiceTitle(e.target.value)}
+                required
+              />
+              <AdminTextField
+                label="Assigned Artisan Pro"
+                value={artisanName}
+                onChange={(e) => setArtisanName(e.target.value)}
+                required
+              />
+              <AdminTextField
+                label="Agreed Booking Amount (NGN)"
+                type="number"
+                min={1000}
+                value={agreedAmount}
+                onChange={(e) => setAgreedAmount(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <AdminTextField
+                label="Service Address"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                required
+              />
+              <AdminTextField
+                label="Scheduled Date"
+                type="date"
+                value={scheduledDate}
+                onChange={(e) => setScheduledDate(e.target.value)}
+                required
+              />
+              <AdminTextField
+                label="Scheduled Time Window"
+                value={scheduledTime}
+                onChange={(e) => setScheduledTime(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <AdminSelectPills
+                label="Booking Dispatch Status"
+                options={BOOKING_STATUS_OPTIONS}
+                value={bookingStatus}
+                onChange={setBookingStatus}
+                columns={5}
+              />
+              <AdminSelectPills
+                label="Escrow Payment Status"
+                options={PAYMENT_STATUS_OPTIONS}
+                value={paymentStatus}
+                onChange={setPaymentStatus}
+                columns={4}
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-3 pt-3 border-t border-surface-frost">
+              {editingId && (
+                <CtaButton
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={resetForm}
+                >
+                  Cancel Edit
+                </CtaButton>
+              )}
+              <CtaButton
+                type="submit"
+                variant="primary"
+                size="sm"
+                disabled={saving}
+              >
+                {editingId ? (
+                  <>
+                    <Save className="h-4 w-4" />
+                    <span>{saving ? "Saving..." : "Update Booking & Dispatch"}</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" />
+                    <span>
+                      {saving ? "Dispatching..." : "Create & Dispatch Pro"}
+                    </span>
+                  </>
+                )}
+              </CtaButton>
+            </div>
+          </form>
+        </AdminInlineForm>
+
         {/* Segmented Filter Tabs & Search Input */}
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+        <div className="mt-6 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
           <AdminSegmentedTabs
             options={tabOptions}
             value={statusFilter}
@@ -195,23 +513,39 @@ export function BookingsDispatchWorkspace({
           />
         </div>
 
-        {/* Bookings Data Table */}
+        {/* Bookings Data Table with Three-Dots Action Button & Dropdown CTAs */}
         <div className="mt-4">
           <AdminDataTable
             title="Service Bookings & Dispatch Queue"
-            subtitle="Monitor active artisan dispatches, client schedules, and job completion states."
+            subtitle="Monitor active artisan dispatches, client schedules, and use the three-dots menu to edit or advance job states."
             badge={`${filtered.length} Showing`}
+            headerAction={
+              <CtaButton
+                variant="primary"
+                size="xs"
+                onClick={() => {
+                  resetForm();
+                  scrollToForm();
+                }}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Booking</span>
+              </CtaButton>
+            }
           >
             {filtered.length === 0 ? (
               <AdminEmptyState
                 title="No Bookings Found"
-                description="Create a new dispatch booking or clear your active status filter."
+                description="Create a new dispatch booking in the inline form above or clear your active status filter."
                 icon={<CalendarCheck className="h-5 w-5 text-accent-sky" />}
                 action={
                   <CtaButton
                     variant="primary"
                     size="xs"
-                    onClick={() => setModalOpen(true)}
+                    onClick={() => {
+                      resetForm();
+                      scrollToForm();
+                    }}
                   >
                     <Plus className="h-3.5 w-3.5" />
                     <span>New Dispatch Booking</span>
@@ -229,7 +563,7 @@ export function BookingsDispatchWorkspace({
                     <AdminTableHead>Agreed Price</AdminTableHead>
                     <AdminTableHead>Status</AdminTableHead>
                     <AdminTableHead className="text-right">
-                      Dispatch Action
+                      Actions
                     </AdminTableHead>
                   </AdminTableRow>
                 </AdminTableHeader>
@@ -290,49 +624,91 @@ export function BookingsDispatchWorkspace({
                       </AdminTableCell>
 
                       <AdminTableCell className="text-right whitespace-nowrap">
-                        {bk.status === "pending" && (
-                          <CtaButton
-                            variant="primary"
-                            size="xs"
-                            disabled={busyId === bk.id}
-                            onClick={() =>
-                              updateBookingStatus(bk.id, "accepted")
-                            }
-                          >
-                            Accept Dispatch
-                          </CtaButton>
-                        )}
-                        {bk.status === "accepted" && (
-                          <CtaButton
-                            variant="secondary"
-                            size="xs"
-                            disabled={busyId === bk.id}
-                            onClick={() =>
-                              updateBookingStatus(bk.id, "in_progress")
-                            }
-                          >
-                            Mark In Progress
-                          </CtaButton>
-                        )}
-                        {bk.status === "in_progress" && (
-                          <CtaButton
-                            variant="primary"
-                            size="xs"
-                            disabled={busyId === bk.id}
-                            onClick={() =>
-                              updateBookingStatus(bk.id, "completed")
-                            }
-                          >
-                            <CheckCircle2 className="h-3 w-3" />
-                            <span>Complete Job</span>
-                          </CtaButton>
-                        )}
-                        {bk.status === "completed" && (
-                          <span className="inline-flex items-center gap-1 rounded-pill bg-brand-50 px-2.5 py-1 font-display text-[11px] font-extrabold text-brand-700 border border-brand-200">
-                            <CheckCircle2 className="h-3 w-3 text-accent-success" />
-                            <span>Completed</span>
-                          </span>
-                        )}
+                        <AdminActionMenu
+                          label={`Booking ${bk.bookingCode}`}
+                          ariaLabel={`Actions for booking ${bk.bookingCode}`}
+                          items={[
+                            {
+                              id: "edit",
+                              label: "Edit Booking in Form",
+                              description: "Modify schedule, pro, or price",
+                              icon: <Pencil className="h-3.5 w-3.5" />,
+                              variant: "primary",
+                              onClick: () => loadBookingIntoForm(bk),
+                            },
+                            {
+                              id: "accept",
+                              label: "Accept Dispatch",
+                              description: "Confirm artisan assignment",
+                              icon: <CalendarCheck className="h-3.5 w-3.5" />,
+                              disabled:
+                                busyId === bk.id || bk.status === "accepted",
+                              onClick: () =>
+                                updateBookingFields(bk.id, {
+                                  status: "accepted",
+                                }),
+                            },
+                            {
+                              id: "in-progress",
+                              label: "Mark In Progress",
+                              description: "Artisan arrived on-site",
+                              icon: <Play className="h-3.5 w-3.5" />,
+                              disabled:
+                                busyId === bk.id || bk.status === "in_progress",
+                              onClick: () =>
+                                updateBookingFields(bk.id, {
+                                  status: "in_progress",
+                                }),
+                            },
+                            {
+                              id: "complete",
+                              label: "Complete Job",
+                              description: "Finalize service & sign-off",
+                              icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+                              disabled:
+                                busyId === bk.id || bk.status === "completed",
+                              onClick: () =>
+                                updateBookingFields(bk.id, {
+                                  status: "completed",
+                                }),
+                            },
+                            {
+                              id: "escrow-funded",
+                              label: "Mark Escrow Funded",
+                              description: "Confirm client escrow deposit",
+                              icon: <Lock className="h-3.5 w-3.5" />,
+                              disabled:
+                                busyId === bk.id ||
+                                bk.paymentStatus === "escrowed",
+                              onClick: () =>
+                                updateBookingFields(bk.id, {
+                                  paymentStatus: "escrowed",
+                                }),
+                            },
+                            {
+                              id: "cancel",
+                              label: "Cancel Booking",
+                              description: "Abort dispatch schedule",
+                              icon: <XCircle className="h-3.5 w-3.5" />,
+                              variant: "danger",
+                              dividerBefore: true,
+                              disabled:
+                                busyId === bk.id || bk.status === "cancelled",
+                              onClick: () =>
+                                updateBookingFields(bk.id, {
+                                  status: "cancelled",
+                                }),
+                            },
+                            {
+                              id: "delete",
+                              label: "Delete Booking",
+                              description: "Remove booking record",
+                              icon: <Trash2 className="h-3.5 w-3.5" />,
+                              variant: "danger",
+                              onClick: () => deleteBooking(bk.id),
+                            },
+                          ]}
+                        />
                       </AdminTableCell>
                     </AdminTableRow>
                   ))}
@@ -342,78 +718,6 @@ export function BookingsDispatchWorkspace({
           </AdminDataTable>
         </div>
       </AdminWorkspaceSlab>
-
-      {/* New Dispatch Booking Modal */}
-      <AdminModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        eyebrow="Service Booking & Dispatch"
-        title="Create Service Booking"
-        description="Schedule a new customer service request, assign a verified artisan, and set the agreed service fee."
-      >
-        <form onSubmit={handleCreateBooking} className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <AdminTextField
-              label="Client Full Name"
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              required
-            />
-            <AdminTextField
-              label="Client Phone"
-              value={clientPhone}
-              onChange={(e) => setClientPhone(e.target.value)}
-              required
-            />
-          </div>
-
-          <AdminTextField
-            label="Service Address"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            required
-          />
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <AdminTextField
-              label="Requested Service"
-              value={serviceTitle}
-              onChange={(e) => setServiceTitle(e.target.value)}
-              required
-            />
-            <AdminTextField
-              label="Assigned Artisan Pro"
-              value={artisanName}
-              onChange={(e) => setArtisanName(e.target.value)}
-              required
-            />
-          </div>
-
-          <AdminTextField
-            label="Agreed Booking Amount (NGN)"
-            type="number"
-            min={1000}
-            value={agreedAmount}
-            onChange={(e) => setAgreedAmount(e.target.value)}
-            required
-          />
-
-          <div className="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-surface-frost">
-            <CtaButton
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => setModalOpen(false)}
-            >
-              Cancel
-            </CtaButton>
-            <CtaButton type="submit" variant="primary" size="sm" disabled={creating}>
-              {creating ? "Dispatching..." : "Create & Dispatch Pro"}
-            </CtaButton>
-          </div>
-        </form>
-      </AdminModal>
     </div>
   );
 }
-

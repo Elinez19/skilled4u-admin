@@ -2,12 +2,20 @@
 
 import * as React from "react";
 import {
+  AlertTriangle,
   CheckCircle2,
   Clock,
   Headset,
   MessageSquare,
+  Pencil,
+  Play,
+  Plus,
+  RotateCcw,
+  Save,
   ShieldCheck,
+  Trash2,
 } from "lucide-react";
+import { AdminActionMenu } from "@/components/admin/ui/admin-action-menu";
 import {
   AdminDataTable,
   AdminEmptyState,
@@ -18,7 +26,13 @@ import {
   AdminTableHeader,
   AdminTableRow,
 } from "@/components/admin/ui/admin-data-table";
-import { AdminSearchInput } from "@/components/admin/ui/admin-form-controls";
+import {
+  AdminInlineForm,
+  AdminSearchInput,
+  AdminSelectPills,
+  AdminTextareaField,
+  AdminTextField,
+} from "@/components/admin/ui/admin-form-controls";
 import {
   AdminHeroBanner,
   AdminWorkspaceSlab,
@@ -34,16 +48,19 @@ import { PillBadge } from "@/components/landing/ui/pill-badge";
 import { Stagger, StaggerItem } from "@/components/motion/reveal";
 
 type TicketFilter = "all" | "pending" | "in_progress" | "completed";
+type TicketStatus = "pending" | "in_progress" | "completed";
+type RequesterRole = "Client" | "Artisan Pro";
+type TicketPriority = "High" | "Normal";
 
 interface SupportTicket {
   id: string;
   ticketCode: string;
   requesterName: string;
-  requesterRole: "Client" | "Artisan Pro";
+  requesterRole: RequesterRole;
   subject: string;
   city: string;
-  priority: "High" | "Normal";
-  status: "pending" | "in_progress" | "completed";
+  priority: TicketPriority;
+  status: TicketStatus;
   updatedAt: string;
 }
 
@@ -75,7 +92,8 @@ const INITIAL_TICKETS: SupportTicket[] = [
     ticketCode: "SUP-4085",
     requesterName: "Toluwalase Adeyemi",
     requesterRole: "Client",
-    subject: "Payment Receipt & Escrow Release Confirmation for Booking #S4U-8710",
+    subject:
+      "Payment Receipt & Escrow Release Confirmation for Booking #S4U-8710",
     city: "Lagos",
     priority: "Normal",
     status: "completed",
@@ -83,15 +101,145 @@ const INITIAL_TICKETS: SupportTicket[] = [
   },
 ];
 
+const ROLE_OPTIONS = [
+  { id: "Client", label: "Customer / Client" },
+  { id: "Artisan Pro", label: "Artisan Pro" },
+] as const;
+
+const PRIORITY_OPTIONS = [
+  { id: "High", label: "High Priority" },
+  { id: "Normal", label: "Normal SLA" },
+] as const;
+
+const TICKET_STATUS_OPTIONS = [
+  { id: "pending", label: "Open / Pending" },
+  { id: "in_progress", label: "In Progress" },
+  { id: "completed", label: "Resolved" },
+] as const;
+
 export default function AdminSupportPage() {
+  const formRef = React.useRef<HTMLDivElement>(null);
+
   const [items, setItems] = React.useState<SupportTicket[]>(INITIAL_TICKETS);
   const [filter, setFilter] = React.useState<TicketFilter>("all");
   const [search, setSearch] = React.useState("");
 
-  function closeTicket(id: string) {
+  // Inline Form State
+  const [formOpen, setFormOpen] = React.useState(true);
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [editingCode, setEditingCode] = React.useState<string | null>(null);
+  const [requesterName, setRequesterName] = React.useState("");
+  const [requesterRole, setRequesterRole] =
+    React.useState<RequesterRole>("Client");
+  const [city, setCity] = React.useState("Abuja");
+  const [priority, setPriority] = React.useState<TicketPriority>("Normal");
+  const [status, setStatus] = React.useState<TicketStatus>("pending");
+  const [subject, setSubject] = React.useState("");
+  const [savedBanner, setSavedBanner] = React.useState<string | null>(null);
+
+  function notifySaved(msg: string) {
+    setSavedBanner(msg);
+    setTimeout(() => setSavedBanner(null), 3500);
+  }
+
+  function scrollToForm() {
+    setFormOpen(true);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+  }
+
+  function resetForm() {
+    setEditingId(null);
+    setEditingCode(null);
+    setRequesterName("");
+    setRequesterRole("Client");
+    setCity("Abuja");
+    setPriority("Normal");
+    setStatus("pending");
+    setSubject("");
+  }
+
+  function loadTicketIntoForm(tkt: SupportTicket) {
+    setEditingId(tkt.id);
+    setEditingCode(tkt.ticketCode);
+    setRequesterName(tkt.requesterName);
+    setRequesterRole(tkt.requesterRole);
+    setCity(tkt.city);
+    setPriority(tkt.priority);
+    setStatus(tkt.status);
+    setSubject(tkt.subject);
+    scrollToForm();
+  }
+
+  function handleSaveTicket(e: React.FormEvent) {
+    e.preventDefault();
+    if (editingId) {
+      setItems((prev) =>
+        prev.map((t) =>
+          t.id === editingId
+            ? {
+                ...t,
+                requesterName,
+                requesterRole,
+                city,
+                priority,
+                status,
+                subject,
+                updatedAt: "Just now",
+              }
+            : t
+        )
+      );
+      notifySaved(`Updated ticket ${editingCode || editingId}`);
+      resetForm();
+    } else {
+      const code = `SUP-${Math.floor(4105 + Math.random() * 890)}`;
+      const newTicket: SupportTicket = {
+        id: `tkt_${Date.now()}`,
+        ticketCode: code,
+        requesterName,
+        requesterRole,
+        city,
+        priority,
+        status,
+        subject,
+        updatedAt: "Just now",
+      };
+      setItems((prev) => [newTicket, ...prev]);
+      notifySaved(`Created support ticket ${code}`);
+      resetForm();
+    }
+  }
+
+  function updateTicketStatus(id: string, nextStatus: TicketStatus) {
     setItems((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, status: "completed" } : t))
+      prev.map((t) =>
+        t.id === id ? { ...t, status: nextStatus, updatedAt: "Just now" } : t
+      )
     );
+    notifySaved(`Ticket marked ${nextStatus.replace("_", " ")}`);
+  }
+
+  function togglePriority(id: string) {
+    setItems((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              priority: t.priority === "High" ? "Normal" : "High",
+              updatedAt: "Just now",
+            }
+          : t
+      )
+    );
+    notifySaved("Ticket priority updated");
+  }
+
+  function deleteTicket(id: string) {
+    setItems((prev) => prev.filter((t) => t.id !== id));
+    if (editingId === id) resetForm();
+    notifySaved("Support ticket deleted");
   }
 
   const openTickets = items.filter((t) => t.status !== "completed").length;
@@ -133,17 +281,21 @@ export default function AdminSupportPage() {
         eyebrowIcon="dot"
         headline="Support & Helpdesk Management."
         highlightWords={["Support", "Helpdesk", "Management."]}
-        subtitle="Assist customers and verified artisans with booking schedule changes, identity verification inquiries, and payout support requests."
+        subtitle="Log, edit, and manage customer and artisan helpdesk tickets using the inline form below, or use the table three-dots action menu to resolve inquiries."
         primaryCta={{
-          label: "Disputes & Claims",
-          href: "/admin/disputes",
+          label: "Log Support Ticket",
+          onClick: () => {
+            resetForm();
+            scrollToForm();
+          },
           variant: "primary",
-          trailingArrow: true,
+          icon: <Plus className="h-4 w-4" />,
         }}
         secondaryCta={{
-          label: "Public FAQs",
-          href: "/faqs",
+          label: "Disputes & Claims",
+          href: "/admin/disputes",
           variant: "secondary",
+          trailingArrow: true,
         }}
       />
 
@@ -188,6 +340,104 @@ export default function AdminSupportPage() {
           </StaggerItem>
         </Stagger>
 
+        {/* Inline Form to Add, Edit, and Manage Support Tickets */}
+        <div className="mt-6">
+          <AdminInlineForm
+            formRef={formRef}
+            eyebrow="Inline Support Helpdesk Form"
+            title={
+              editingId
+                ? `Edit & Manage Ticket ${editingCode || editingId}`
+                : "Log, Edit & Manage Support Ticket"
+            }
+            description="Create a new helpdesk ticket for a customer or artisan, or select any row from the table menu below to edit details, priority, and resolution status."
+            isEditing={Boolean(editingId)}
+            editingBadgeText={`Ticket ${editingCode || ""}`}
+            onResetToCreate={resetForm}
+            open={formOpen}
+            onOpenChange={setFormOpen}
+            savedMessage={savedBanner}
+          >
+            <form onSubmit={handleSaveTicket} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <AdminTextField
+                  label="Requester Full Name"
+                  placeholder="e.g. Amina Bello"
+                  value={requesterName}
+                  onChange={(e) => setRequesterName(e.target.value)}
+                  required
+                />
+                <AdminTextField
+                  label="City / Dispatch Zone"
+                  placeholder="Abuja or Lagos"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  required
+                />
+                <AdminSelectPills
+                  label="Requester Role"
+                  options={ROLE_OPTIONS}
+                  value={requesterRole}
+                  onChange={setRequesterRole}
+                  columns={2}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <AdminSelectPills
+                  label="Ticket Priority"
+                  options={PRIORITY_OPTIONS}
+                  value={priority}
+                  onChange={setPriority}
+                  columns={2}
+                />
+                <AdminSelectPills
+                  label="Ticket Resolution Status"
+                  options={TICKET_STATUS_OPTIONS}
+                  value={status}
+                  onChange={setStatus}
+                  columns={3}
+                />
+              </div>
+
+              <AdminTextareaField
+                label="Inquiry Subject & Support Notes"
+                placeholder="Describe the customer or artisan support request, booking reference, or account update..."
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                rows={2}
+                required
+              />
+
+              <div className="flex flex-wrap items-center justify-end gap-3 pt-3 border-t border-surface-frost">
+                {editingId && (
+                  <CtaButton
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={resetForm}
+                  >
+                    Cancel Edit
+                  </CtaButton>
+                )}
+                <CtaButton type="submit" variant="primary" size="sm">
+                  {editingId ? (
+                    <>
+                      <Save className="h-4 w-4" />
+                      <span>Update Support Ticket</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4" />
+                      <span>Create Support Ticket</span>
+                    </>
+                  )}
+                </CtaButton>
+              </div>
+            </form>
+          </AdminInlineForm>
+        </div>
+
         <div className="mt-6 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
           <AdminSegmentedTabs
             options={tabOptions}
@@ -204,11 +454,25 @@ export default function AdminSupportPage() {
           />
         </div>
 
+        {/* Support Table with Three-Dots Action Button & Dropdown CTAs */}
         <div className="mt-4">
           <AdminDataTable
             title="Live Support & Helpdesk Queue"
-            subtitle="Respond to artisan account updates, customer booking questions, and service support tickets."
+            subtitle="Respond to artisan account updates, customer booking questions, and use the three-dots menu to edit or resolve tickets."
             badge={`${filtered.length} Showing`}
+            headerAction={
+              <CtaButton
+                variant="primary"
+                size="xs"
+                onClick={() => {
+                  resetForm();
+                  scrollToForm();
+                }}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Log Ticket</span>
+              </CtaButton>
+            }
           >
             {filtered.length === 0 ? (
               <AdminEmptyState
@@ -226,7 +490,7 @@ export default function AdminSupportPage() {
                     <AdminTableHead>Priority</AdminTableHead>
                     <AdminTableHead>Status</AdminTableHead>
                     <AdminTableHead className="text-right">
-                      Action
+                      Actions
                     </AdminTableHead>
                   </AdminTableRow>
                 </AdminTableHeader>
@@ -271,21 +535,66 @@ export default function AdminSupportPage() {
                       </AdminTableCell>
 
                       <AdminTableCell className="text-right whitespace-nowrap">
-                        {tkt.status !== "completed" ? (
-                          <CtaButton
-                            variant="primary"
-                            size="xs"
-                            onClick={() => closeTicket(tkt.id)}
-                          >
-                            <CheckCircle2 className="h-3 w-3" />
-                            <span>Mark Resolved</span>
-                          </CtaButton>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-pill bg-brand-50 px-2.5 py-1 font-display text-[11px] font-extrabold text-brand-700 border border-brand-200">
-                            <CheckCircle2 className="h-3 w-3 text-accent-success" />
-                            <span>Closed</span>
-                          </span>
-                        )}
+                        <AdminActionMenu
+                          label={`Ticket ${tkt.ticketCode}`}
+                          ariaLabel={`Actions for ticket ${tkt.ticketCode}`}
+                          items={[
+                            {
+                              id: "edit",
+                              label: "Edit Ticket in Form",
+                              description: "Update subject, role, or priority",
+                              icon: <Pencil className="h-3.5 w-3.5" />,
+                              variant: "primary",
+                              onClick: () => loadTicketIntoForm(tkt),
+                            },
+                            {
+                              id: "in-progress",
+                              label: "Mark In Progress",
+                              description: "Assign to concierge agent",
+                              icon: <Play className="h-3.5 w-3.5" />,
+                              disabled: tkt.status === "in_progress",
+                              onClick: () =>
+                                updateTicketStatus(tkt.id, "in_progress"),
+                            },
+                            {
+                              id: "resolve",
+                              label: "Mark Resolved & Close",
+                              description: "Complete helpdesk inquiry",
+                              icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+                              disabled: tkt.status === "completed",
+                              onClick: () =>
+                                updateTicketStatus(tkt.id, "completed"),
+                            },
+                            {
+                              id: "priority",
+                              label:
+                                tkt.priority === "High"
+                                  ? "Set Normal Priority"
+                                  : "Escalate to High Priority",
+                              description: "Adjust SLA response tier",
+                              icon: <AlertTriangle className="h-3.5 w-3.5" />,
+                              onClick: () => togglePriority(tkt.id),
+                            },
+                            {
+                              id: "reopen",
+                              label: "Reopen Ticket",
+                              description: "Return to open queue",
+                              icon: <RotateCcw className="h-3.5 w-3.5" />,
+                              disabled: tkt.status === "pending",
+                              onClick: () =>
+                                updateTicketStatus(tkt.id, "pending"),
+                            },
+                            {
+                              id: "delete",
+                              label: "Delete Ticket",
+                              description: "Remove ticket from queue",
+                              icon: <Trash2 className="h-3.5 w-3.5" />,
+                              variant: "danger",
+                              dividerBefore: true,
+                              onClick: () => deleteTicket(tkt.id),
+                            },
+                          ]}
+                        />
                       </AdminTableCell>
                     </AdminTableRow>
                   ))}
@@ -298,4 +607,3 @@ export default function AdminSupportPage() {
     </div>
   );
 }
-

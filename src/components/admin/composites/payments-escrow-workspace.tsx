@@ -2,15 +2,19 @@
 
 import * as React from "react";
 import {
-  CheckCircle2,
+  Clock,
   CreditCard,
-  Loader2,
   Lock,
+  Pencil,
   Plus,
+  RotateCcw,
+  Save,
   Send,
+  Trash2,
   TrendingUp,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { AdminActionMenu } from "@/components/admin/ui/admin-action-menu";
 import {
   AdminDataTable,
   AdminEmptyState,
@@ -22,6 +26,7 @@ import {
   AdminTableRow,
 } from "@/components/admin/ui/admin-data-table";
 import {
+  AdminInlineForm,
   AdminSearchInput,
   AdminSelectPills,
   AdminTextField,
@@ -31,7 +36,6 @@ import {
   AdminWorkspaceSlab,
 } from "@/components/admin/ui/admin-hero-banner";
 import { AdminKpiCard } from "@/components/admin/ui/admin-kpi-card";
-import { AdminModal } from "@/components/admin/ui/admin-modal";
 import {
   AdminSegmentedTabs,
   type AdminTabOption,
@@ -45,6 +49,7 @@ import { formatCurrency } from "@/lib/utils";
 
 type EscrowFilter = "all" | "held" | "released" | "pending";
 type PaymentChannel = "card" | "bank_transfer" | "mobile_money" | "usdt";
+type EscrowStateOption = "held" | "released" | "pending" | "refunded";
 
 const CHANNEL_OPTIONS = [
   { id: "card", label: "Card" },
@@ -53,19 +58,30 @@ const CHANNEL_OPTIONS = [
   { id: "usdt", label: "USDT" },
 ] as const;
 
+const ESCROW_STATE_OPTIONS = [
+  { id: "held", label: "Held in Escrow" },
+  { id: "released", label: "Released Payout" },
+  { id: "pending", label: "Pending Deposit" },
+  { id: "refunded", label: "Refunded" },
+] as const;
+
 export function PaymentsEscrowWorkspace({
   initialPayments,
 }: {
   initialPayments: PaymentRow[];
 }) {
   const router = useRouter();
+  const formRef = React.useRef<HTMLDivElement>(null);
+
   const [items, setItems] = React.useState<PaymentRow[]>(initialPayments);
   const [filter, setFilter] = React.useState<EscrowFilter>("all");
   const [search, setSearch] = React.useState("");
   const [releasingId, setReleasingId] = React.useState<string | null>(null);
-  const [modalOpen, setModalOpen] = React.useState(false);
 
-  // New Bachs checkout simulation fields
+  // Inline Form State (replaces modal)
+  const [formOpen, setFormOpen] = React.useState(true);
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [editingRef, setEditingRef] = React.useState<string | null>(null);
   const [clientName, setClientName] = React.useState("Toluwalase Adeyemi");
   const [clientEmail, setClientEmail] = React.useState(
     "tolu.adeyemi@gmail.com"
@@ -74,7 +90,45 @@ export function PaymentsEscrowWorkspace({
   const [amount, setAmount] = React.useState("35000");
   const [paymentMethod, setPaymentMethod] =
     React.useState<PaymentChannel>("card");
-  const [creating, setCreating] = React.useState(false);
+  const [escrowStatus, setEscrowStatus] =
+    React.useState<EscrowStateOption>("held");
+  const [saving, setSaving] = React.useState(false);
+  const [savedBanner, setSavedBanner] = React.useState<string | null>(null);
+
+  function notifySaved(msg: string) {
+    setSavedBanner(msg);
+    setTimeout(() => setSavedBanner(null), 3500);
+  }
+
+  function scrollToForm() {
+    setFormOpen(true);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+  }
+
+  function resetForm() {
+    setEditingId(null);
+    setEditingRef(null);
+    setClientName("Toluwalase Adeyemi");
+    setClientEmail("tolu.adeyemi@gmail.com");
+    setArtisanName("Emeka Okafor");
+    setAmount("35000");
+    setPaymentMethod("card");
+    setEscrowStatus("held");
+  }
+
+  function loadPaymentIntoForm(pay: PaymentRow) {
+    setEditingId(pay.id);
+    setEditingRef(pay.reference);
+    setClientName(pay.clientName);
+    setClientEmail(pay.clientEmail);
+    setArtisanName(pay.artisanName);
+    setAmount(String(pay.amount));
+    setPaymentMethod((pay.paymentMethod as PaymentChannel) || "card");
+    setEscrowStatus((pay.escrowStatus as EscrowStateOption) || "held");
+    scrollToForm();
+  }
 
   async function handleReleaseEscrow(paymentId: string) {
     setReleasingId(paymentId);
@@ -88,37 +142,145 @@ export function PaymentsEscrowWorkspace({
         const { data } = await res.json();
         setItems((prev) => prev.map((p) => (p.id === paymentId ? data : p)));
         router.refresh();
+      } else {
+        setItems((prev) =>
+          prev.map((p) =>
+            p.id === paymentId
+              ? {
+                  ...p,
+                  escrowStatus: "released",
+                  status: "settled",
+                  releasedAt: new Date(),
+                }
+              : p
+          )
+        );
       }
+      notifySaved("Artisan 90% payout released from escrow");
     } finally {
       setReleasingId(null);
     }
   }
 
-  async function handleInitializePayment(e: React.FormEvent) {
+  function updateEscrowStateLocal(
+    paymentId: string,
+    nextEscrow: EscrowStateOption
+  ) {
+    setItems((prev) =>
+      prev.map((p) =>
+        p.id === paymentId
+          ? {
+              ...p,
+              escrowStatus: nextEscrow,
+              status:
+                nextEscrow === "released"
+                  ? "settled"
+                  : nextEscrow === "held"
+                    ? "escrowed"
+                    : nextEscrow === "refunded"
+                      ? "refunded"
+                      : "initialized",
+            }
+          : p
+      )
+    );
+    notifySaved(`Escrow state updated to ${nextEscrow}`);
+  }
+
+  function deletePayment(paymentId: string) {
+    setItems((prev) => prev.filter((p) => p.id !== paymentId));
+    if (editingId === paymentId) resetForm();
+    notifySaved("Transaction record removed");
+  }
+
+  async function handleSavePayment(e: React.FormEvent) {
     e.preventDefault();
-    setCreating(true);
+    setSaving(true);
     try {
-      const res = await fetch("/api/v1/payments/initialize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clientName,
-          clientEmail,
-          artisanId: "emeka-okafor",
-          artisanName,
-          amount: Number(amount),
-          currency: "NGN",
-          paymentMethod,
-        }),
-      });
-      if (res.ok) {
-        const { data } = await res.json();
-        setItems((prev) => [data, ...prev]);
-        setModalOpen(false);
-        router.refresh();
+      const gross = Number(amount) || 0;
+      const artisanPayout = Math.round(gross * 0.9);
+      const platformFee = Math.round(gross * 0.1);
+
+      if (editingId) {
+        setItems((prev) =>
+          prev.map((p) =>
+            p.id === editingId
+              ? {
+                  ...p,
+                  clientName,
+                  clientEmail,
+                  artisanName,
+                  amount: gross,
+                  artisanPayout,
+                  platformFee,
+                  paymentMethod,
+                  escrowStatus,
+                  status:
+                    escrowStatus === "released"
+                      ? "settled"
+                      : escrowStatus === "held"
+                        ? "escrowed"
+                        : escrowStatus === "refunded"
+                          ? "refunded"
+                          : "initialized",
+                }
+              : p
+          )
+        );
+        notifySaved(`Updated transaction ${editingRef || editingId}`);
+        resetForm();
+      } else {
+        const res = await fetch("/api/v1/payments/initialize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clientName,
+            clientEmail,
+            artisanId: "emeka-okafor",
+            artisanName,
+            amount: gross,
+            currency: "NGN",
+            paymentMethod,
+          }),
+        });
+        if (res.ok) {
+          const { data } = await res.json();
+          const finalRecord =
+            escrowStatus !== "held"
+              ? { ...data, escrowStatus }
+              : data;
+          setItems((prev) => [finalRecord, ...prev]);
+          router.refresh();
+        } else {
+          const fallbackPay: PaymentRow = {
+            id: `pay_${Date.now()}`,
+            reference: `BCHS-S4U-${Date.now().toString().slice(-6)}`,
+            bachsTransactionId: `bchs_${Date.now().toString().slice(-6)}`,
+            bookingId: null,
+            clientName,
+            clientEmail,
+            artisanId: "emeka-okafor",
+            artisanName,
+            amount: gross,
+            platformFee,
+            artisanPayout,
+            currency: "NGN",
+            paymentMethod,
+            status: escrowStatus === "released" ? "settled" : "escrowed",
+            escrowStatus,
+            checkoutUrl: null,
+            metadata: {},
+            paidAt: new Date(),
+            releasedAt: escrowStatus === "released" ? new Date() : null,
+            createdAt: new Date(),
+          };
+          setItems((prev) => [fallbackPay, ...prev]);
+        }
+        notifySaved(`Recorded escrow transaction for ${clientName}`);
+        resetForm();
       }
     } finally {
-      setCreating(false);
+      setSaving(false);
     }
   }
 
@@ -158,16 +320,19 @@ export function PaymentsEscrowWorkspace({
   });
 
   return (
-    <div className="space-y-2 sm:space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <AdminHeroBanner
         eyebrow="Marketplace Financials & Escrow"
         eyebrowIcon="dot"
         headline="Payments & Escrow Ledger."
         highlightWords={["Payments", "Escrow", "Ledger."]}
-        subtitle="Manage customer escrow deposits, track artisan payouts and platform commissions, and release settlements once bookings are completed."
+        subtitle="Add, edit, and manage customer escrow deposits, artisan 90% payouts, and platform 10% commissions using the inline form and table actions below."
         primaryCta={{
           label: "Record Escrow Deposit",
-          onClick: () => setModalOpen(true),
+          onClick: () => {
+            resetForm();
+            scrollToForm();
+          },
           variant: "primary",
           icon: <Plus className="h-4 w-4" />,
         }}
@@ -220,6 +385,132 @@ export function PaymentsEscrowWorkspace({
           </StaggerItem>
         </Stagger>
 
+        {/* Inline Form to Add, Edit, and Manage Financials & Escrow Transactions */}
+        <div className="mt-6">
+          <AdminInlineForm
+            formRef={formRef}
+            eyebrow="Inline Financials & Escrow Form"
+            title={
+              editingId
+                ? `Edit & Manage Transaction ${editingRef || editingId}`
+                : "Record & Manage Escrow Transaction"
+            }
+            description="Log a customer booking deposit, adjust artisan beneficiary payouts, or update escrow settlement states inline."
+            isEditing={Boolean(editingId)}
+            editingBadgeText={`Ref: ${editingRef || ""}`}
+            onResetToCreate={resetForm}
+            open={formOpen}
+            onOpenChange={setFormOpen}
+            savedMessage={savedBanner}
+          >
+            <form onSubmit={handleSavePayment} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <AdminTextField
+                  label="Client Full Name"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  required
+                />
+                <AdminTextField
+                  label="Client Email"
+                  type="email"
+                  value={clientEmail}
+                  onChange={(e) => setClientEmail(e.target.value)}
+                  required
+                />
+                <AdminTextField
+                  label="Artisan Beneficiary"
+                  value={artisanName}
+                  onChange={(e) => setArtisanName(e.target.value)}
+                  required
+                />
+                <AdminTextField
+                  label="Gross Amount (NGN)"
+                  type="number"
+                  min={1000}
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <AdminSelectPills
+                  label="Payment Channel"
+                  options={CHANNEL_OPTIONS}
+                  value={paymentMethod}
+                  onChange={setPaymentMethod}
+                  columns={4}
+                />
+                <AdminSelectPills
+                  label="Escrow Settlement State"
+                  options={ESCROW_STATE_OPTIONS}
+                  value={escrowStatus}
+                  onChange={setEscrowStatus}
+                  columns={4}
+                />
+              </div>
+
+              {/* Tokenized 90/10 Split Preview Card */}
+              <div className="surface-slab-ink rounded-2xl border-2 border-brand-700 p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-ink-on-blue-muted">
+                    Artisan Escrow Share (90%):
+                  </span>
+                  <span className="font-display text-sm font-extrabold text-accent-sky">
+                    {formatCurrency(Math.round(Number(amount || 0) * 0.9))}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-ink-on-blue-muted">
+                    Platform Commission (10%):
+                  </span>
+                  <span className="font-display text-sm font-extrabold text-accent-gold">
+                    {formatCurrency(Math.round(Number(amount || 0) * 0.1))}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-end gap-3 pt-3 border-t border-surface-frost">
+                {editingId && (
+                  <CtaButton
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={resetForm}
+                  >
+                    Cancel Edit
+                  </CtaButton>
+                )}
+                <CtaButton
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={saving}
+                >
+                  {editingId ? (
+                    <>
+                      <Save className="h-4 w-4" />
+                      <span>
+                        {saving ? "Saving..." : "Update Escrow Transaction"}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4" />
+                      <span>
+                        {saving
+                          ? "Recording..."
+                          : "Create & Lock in Escrow"}
+                      </span>
+                    </>
+                  )}
+                </CtaButton>
+              </div>
+            </form>
+          </AdminInlineForm>
+        </div>
+
         {/* Segmented Filter Tabs & Search */}
         <div className="mt-6 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
           <AdminSegmentedTabs
@@ -237,23 +528,39 @@ export function PaymentsEscrowWorkspace({
           />
         </div>
 
-        {/* Payments Ledger Table */}
+        {/* Payments Ledger Table with Three-Dots Action Button & Dropdown CTAs */}
         <div className="mt-4">
           <AdminDataTable
             title="Escrow & Payout Settlement Ledger"
-            subtitle="Track customer booking deposits, platform commissions, and artisan bank settlements."
+            subtitle="Track customer booking deposits, platform commissions, and use the three-dots menu to edit or release artisan payouts."
             badge={`${filtered.length} Showing`}
+            headerAction={
+              <CtaButton
+                variant="primary"
+                size="xs"
+                onClick={() => {
+                  resetForm();
+                  scrollToForm();
+                }}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Transaction</span>
+              </CtaButton>
+            }
           >
             {filtered.length === 0 ? (
               <AdminEmptyState
                 title="No Escrow Records Found"
-                description="Record a new customer escrow deposit or clear your active search filter."
+                description="Record a new customer escrow deposit in the inline form above or clear your active search filter."
                 icon={<CreditCard className="h-5 w-5 text-accent-sky" />}
                 action={
                   <CtaButton
                     variant="primary"
                     size="xs"
-                    onClick={() => setModalOpen(true)}
+                    onClick={() => {
+                      resetForm();
+                      scrollToForm();
+                    }}
                   >
                     <Plus className="h-3.5 w-3.5" />
                     <span>Record Escrow Deposit</span>
@@ -272,7 +579,7 @@ export function PaymentsEscrowWorkspace({
                     <AdminTableHead>Channel</AdminTableHead>
                     <AdminTableHead>Escrow State</AdminTableHead>
                     <AdminTableHead className="text-right">
-                      Settlement Action
+                      Actions
                     </AdminTableHead>
                   </AdminTableRow>
                 </AdminTableHeader>
@@ -328,35 +635,67 @@ export function PaymentsEscrowWorkspace({
                       </AdminTableCell>
 
                       <AdminTableCell className="text-right whitespace-nowrap">
-                        {pay.escrowStatus === "held" ? (
-                          <CtaButton
-                            variant="primary"
-                            size="xs"
-                            disabled={releasingId === pay.id}
-                            onClick={() => handleReleaseEscrow(pay.id)}
-                          >
-                            {releasingId === pay.id ? (
-                              <>
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                                <span>Settling...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Send className="h-3 w-3" />
-                                <span>Release Payout</span>
-                              </>
-                            )}
-                          </CtaButton>
-                        ) : pay.escrowStatus === "released" ? (
-                          <span className="inline-flex items-center gap-1 rounded-pill bg-brand-50 px-2.5 py-1 font-display text-[11px] font-extrabold text-brand-700 border border-brand-200">
-                            <CheckCircle2 className="h-3 w-3 text-accent-success" />
-                            <span>Settled</span>
-                          </span>
-                        ) : (
-                          <span className="text-[11px] font-semibold text-ink-muted">
-                            Awaiting Deposit
-                          </span>
-                        )}
+                        <AdminActionMenu
+                          label={`Ref ${pay.reference}`}
+                          ariaLabel={`Actions for transaction ${pay.reference}`}
+                          items={[
+                            {
+                              id: "edit",
+                              label: "Edit Transaction in Form",
+                              description: "Adjust amount, channel, or state",
+                              icon: <Pencil className="h-3.5 w-3.5" />,
+                              variant: "primary",
+                              onClick: () => loadPaymentIntoForm(pay),
+                            },
+                            {
+                              id: "release",
+                              label: "Release Payout (90%)",
+                              description: "Settle funds to artisan bank",
+                              icon: <Send className="h-3.5 w-3.5" />,
+                              disabled:
+                                releasingId === pay.id ||
+                                pay.escrowStatus === "released",
+                              onClick: () => handleReleaseEscrow(pay.id),
+                            },
+                            {
+                              id: "hold",
+                              label: "Lock in Escrow Hold",
+                              description: "Hold funds pending verification",
+                              icon: <Lock className="h-3.5 w-3.5" />,
+                              disabled: pay.escrowStatus === "held",
+                              onClick: () =>
+                                updateEscrowStateLocal(pay.id, "held"),
+                            },
+                            {
+                              id: "pending",
+                              label: "Mark Pending Deposit",
+                              description: "Awaiting gateway confirmation",
+                              icon: <Clock className="h-3.5 w-3.5" />,
+                              disabled: pay.escrowStatus === "pending",
+                              onClick: () =>
+                                updateEscrowStateLocal(pay.id, "pending"),
+                            },
+                            {
+                              id: "refund",
+                              label: "Refund Client Deposit",
+                              description: "Return escrow to customer",
+                              icon: <RotateCcw className="h-3.5 w-3.5" />,
+                              variant: "danger",
+                              dividerBefore: true,
+                              disabled: pay.escrowStatus === "refunded",
+                              onClick: () =>
+                                updateEscrowStateLocal(pay.id, "refunded"),
+                            },
+                            {
+                              id: "delete",
+                              label: "Delete Transaction",
+                              description: "Remove from ledger",
+                              icon: <Trash2 className="h-3.5 w-3.5" />,
+                              variant: "danger",
+                              onClick: () => deletePayment(pay.id),
+                            },
+                          ]}
+                        />
                       </AdminTableCell>
                     </AdminTableRow>
                   ))}
@@ -366,97 +705,6 @@ export function PaymentsEscrowWorkspace({
           </AdminDataTable>
         </div>
       </AdminWorkspaceSlab>
-
-      {/* Record Escrow Deposit Modal */}
-      <AdminModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        eyebrow="Escrow Payment Management"
-        title="Record Escrow Deposit"
-        description="Log a customer booking payment, calculate the artisan payout and platform commission, and hold funds safely in escrow until job completion."
-      >
-        <form onSubmit={handleInitializePayment} className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <AdminTextField
-              label="Client Name"
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              required
-            />
-            <AdminTextField
-              label="Client Email"
-              type="email"
-              value={clientEmail}
-              onChange={(e) => setClientEmail(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <AdminTextField
-              label="Artisan Beneficiary"
-              value={artisanName}
-              onChange={(e) => setArtisanName(e.target.value)}
-              required
-            />
-            <AdminTextField
-              label="Gross Amount (NGN)"
-              type="number"
-              min={1000}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-            />
-          </div>
-
-          <AdminSelectPills
-            label="Payment Method"
-            options={CHANNEL_OPTIONS}
-            value={paymentMethod}
-            onChange={setPaymentMethod}
-          />
-
-          {/* Tokenized 90/10 Split Preview Card */}
-          <div className="surface-slab-ink rounded-2xl border-2 border-brand-700 p-4 space-y-2 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-ink-on-blue-muted">
-                Artisan Escrow Share (90%):
-              </span>
-              <span className="font-display text-sm font-extrabold text-accent-sky">
-                {formatCurrency(Math.round(Number(amount || 0) * 0.9))}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-ink-on-blue-muted">
-                Platform Commission (10%):
-              </span>
-              <span className="font-display text-sm font-extrabold text-accent-gold">
-                {formatCurrency(Math.round(Number(amount || 0) * 0.1))}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-surface-frost">
-            <CtaButton
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => setModalOpen(false)}
-            >
-              Cancel
-            </CtaButton>
-            <CtaButton
-              type="submit"
-              variant="primary"
-              size="sm"
-              disabled={creating}
-            >
-              {creating ? "Initializing..." : "Create & Lock in Escrow"}
-            </CtaButton>
-          </div>
-        </form>
-      </AdminModal>
     </div>
   );
 }
-
