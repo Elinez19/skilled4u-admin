@@ -155,7 +155,7 @@ export function AdminAuthPortal() {
 
             <Reveal delay={0.14}>
               <p className="max-w-md text-xs sm:text-sm font-semibold leading-relaxed text-ink-on-blue-muted">
-                Sign in to manage customer, artisan, and administrator accounts,
+                Manage customers, artisans, and administrator accounts,
                 coordinate service bookings and dispatches, resolve disputes,
                 moderate reviews, and oversee platform payouts.
               </p>
