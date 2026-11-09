@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Wrench } from "lucide-react";
 import { tokens } from "@/lib/tokens";
 import { cn } from "@/lib/utils";
 
@@ -9,6 +8,117 @@ export interface BrandLogoProps {
   tone?: "on-blue" | "on-light";
   size?: "sm" | "md" | "lg";
   className?: string;
+}
+
+/**
+ * Standalone 3D Glossy Brand Squircle Mark (matches the favicon `src/app/icon.svg`)
+ */
+export function BrandLogoMark({
+  size = "md",
+  className,
+}: {
+  size?: "sm" | "md" | "lg";
+  className?: string;
+}) {
+  const uid = React.useId().replace(/:/g, "");
+  const gradId = `skilled4uBrandGrad-${uid}`;
+  const sheenId = `skilled4uSheen-${uid}`;
+
+  return (
+    <span
+      className={cn(
+        "relative inline-flex shrink-0 items-center justify-center transition-transform duration-300 group-hover:scale-105",
+        size === "lg"
+          ? "h-12 w-12"
+          : size === "sm"
+            ? "h-9 w-9"
+            : "h-11 w-11",
+        className
+      )}
+      aria-hidden="true"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 64 64"
+        fill="none"
+        className="h-full w-full overflow-visible drop-shadow-md"
+      >
+        <defs>
+          <linearGradient
+            id={gradId}
+            x1="30"
+            y1="4"
+            x2="30"
+            y2="56"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0%" stopColor={tokens.colors.brand[400]} />
+            <stop offset="48%" stopColor={tokens.colors.brand[600]} />
+            <stop offset="100%" stopColor={tokens.colors.brand[700]} />
+          </linearGradient>
+          <linearGradient
+            id={sheenId}
+            x1="8"
+            y1="6"
+            x2="52"
+            y2="30"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop
+              offset="0%"
+              stopColor={tokens.colors.surface.porcelain}
+              stopOpacity="0.42"
+            />
+            <stop
+              offset="100%"
+              stopColor={tokens.colors.surface.porcelain}
+              stopOpacity="0"
+            />
+          </linearGradient>
+        </defs>
+
+        {/* Main Glossy Brand Squircle */}
+        <rect
+          x="4"
+          y="4"
+          width="52"
+          height="52"
+          rx="15"
+          fill={`url(#${gradId})`}
+          stroke={tokens.colors.surface.porcelain}
+          strokeWidth="2.5"
+        />
+
+        {/* Top Specular Gloss Highlight */}
+        <path
+          d="M19 6.5H41C47.9036 6.5 53.5 12.0964 53.5 19V22C42 26 20 26 6.5 22V19C6.5 12.0964 12.0964 6.5 19 6.5Z"
+          fill={`url(#${sheenId})`}
+        />
+
+        {/* Centered Wrench Icon (24x24 scaled 1.25x around 30,30) */}
+        <g transform="translate(15, 15) scale(1.25)">
+          <path
+            d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
+            stroke={tokens.colors.surface.porcelain}
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </g>
+
+        {/* Signature Sky-Blue Status Badge Dot */}
+        <circle
+          cx="51"
+          cy="51"
+          r="7.5"
+          fill={tokens.colors.accent.sky}
+          stroke={tokens.colors.surface.porcelain}
+          strokeWidth="3"
+        />
+      </svg>
+    </span>
+  );
 }
 
 export function BrandLogo({
@@ -26,33 +136,7 @@ export function BrandLogo({
         className
       )}
     >
-      <span
-        className={cn(
-          "relative grid place-items-center rounded-2xl border-2 transition-transform duration-300 group-hover:scale-105",
-          size === "lg"
-            ? "h-12 w-12"
-            : size === "sm"
-              ? "h-9 w-9 rounded-xl"
-              : "h-11 w-11",
-          isOnBlue
-            ? "bg-surface-porcelain text-brand-600 border-surface-porcelain shadow-gloss-card"
-            : "cta-surface-primary text-ink-on-blue"
-        )}
-      >
-        <Wrench
-          className={cn(
-            size === "lg"
-              ? "h-6 w-6"
-              : size === "sm"
-                ? "h-4 w-4"
-                : "h-5 w-5"
-          )}
-        />
-        <span
-          className="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full border-2 border-surface-porcelain bg-accent-sky"
-          aria-hidden="true"
-        />
-      </span>
+      <BrandLogoMark size={size} />
       <span
         className={cn(
           "font-display font-extrabold tracking-tight",
