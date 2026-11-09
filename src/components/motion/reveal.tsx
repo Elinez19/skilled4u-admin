@@ -13,7 +13,7 @@ export interface RevealProps extends HTMLMotionProps<"div"> {
   delay?: number;
   y?: number;
   once?: boolean;
-  amount?: number;
+  amount?: number | "some" | "all";
 }
 
 export function Reveal({
@@ -21,7 +21,7 @@ export function Reveal({
   delay = 0,
   y = 40,
   once = true,
-  amount = 0.2,
+  amount = "some",
   ...props
 }: RevealProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -47,7 +47,7 @@ export interface StaggerProps extends HTMLMotionProps<"div"> {
   stagger?: number;
   delayChildren?: number;
   once?: boolean;
-  amount?: number;
+  amount?: number | "some" | "all";
 }
 
 export function Stagger({
@@ -55,13 +55,18 @@ export function Stagger({
   stagger = motionTokens.stagger.cards,
   delayChildren = 0.06,
   once = true,
-  amount = 0.18,
+  amount = "some",
   ...props
 }: StaggerProps) {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
     <motion.div
-      variants={staggerContainerVariants(stagger, delayChildren)}
-      initial="hidden"
+      variants={staggerContainerVariants(
+        prefersReducedMotion ? 0 : stagger,
+        prefersReducedMotion ? 0 : delayChildren
+      )}
+      initial={prefersReducedMotion ? "visible" : "hidden"}
       whileInView="visible"
       viewport={{ once, amount }}
       {...props}
@@ -92,7 +97,7 @@ export function ScaleSlab({
       variants={prefersReducedMotion ? undefined : scaleSlabVariants}
       initial={prefersReducedMotion ? { opacity: 1 } : "hidden"}
       whileInView={prefersReducedMotion ? { opacity: 1 } : "visible"}
-      viewport={{ once: true, amount: 0.12 }}
+      viewport={{ once: true, amount: "some" }}
       {...props}
     >
       {children}

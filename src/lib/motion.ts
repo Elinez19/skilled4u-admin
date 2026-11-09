@@ -44,7 +44,7 @@ export const motionTokens = {
   },
   viewport: {
     once: true,
-    amount: 0.22,
+    amount: "some" as const,
   },
 } as const;
 
