@@ -1,17 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { auth } from "@/lib/auth";
-import { normalizeUserRole } from "@/lib/auth-guard";
+import { normalizeUserRole, requireAdmin } from "@/lib/auth-guard";
+import { protectMutationApi } from "@/lib/arcjet";
 import { db } from "@/db";
-import { user as userTable } from "@/db/schema";
+import { session as sessionTable, user as userTable } from "@/db/schema";
 import { sendWelcomeOnboardingEmail } from "@/lib/resend";
 
 /**
  * GET /api/v1/users?role=client|admin|artisan
- * Lists users stored in NeonDB PostgreSQL.
+ * Lists users stored in PostgreSQL (Admin only).
  */
 export async function GET(req: NextRequest) {
   try {
+    const adminGuard = await requireAdmin(req);
+    if (!adminGuard.ok) return adminGuard.response;
+
     const { searchParams } = new URL(req.url);
     const roleFilter = searchParams.get("role");
 
@@ -30,7 +34,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error("GET /api/v1/users error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch users from NeonDB" },
+      { error: "Failed to fetch users" },
       { status: 500 }
     );
   }
@@ -38,11 +42,17 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/v1/users
- * Creates a new Customer, Administrator, or Artisan user in NeonDB via Better Auth
+ * Creates a new Customer, Administrator, or Artisan user via Better Auth (Admin only)
  * and sends a Resend welcome/onboarding email.
  */
 export async function POST(req: NextRequest) {
   try {
+    const blocked = await protectMutationApi(req);
+    if (blocked) return blocked;
+
+    const adminGuard = await requireAdmin(req);
+    if (!adminGuard.ok) return adminGuard.response;
+
     const body = await req.json();
     const {
       name,
@@ -66,10 +76,19 @@ export async function POST(req: NextRequest) {
 
     const normalizedEmail = String(email).trim().toLowerCase();
     const role = normalizeUserRole(rawRole);
+
+    // Granular RBAC: Only a Super Admin can create or modify Administrator accounts
+    if (role === "admin") {
+      const superGuard = await requireAdmin(req, ["super_admin"]);
+      if (!superGuard.ok) return superGuard.response;
+    }
+
     const resolvedCity = city || "Abuja (Wuse II)";
     const resolvedPhone = phone || "+234 803 550 1920";
     const resolvedPassword =
       password || (role === "admin" ? "Admin@2026" : "Customer@2026");
+    const enforceAdminPasswordReset =
+      role === "admin" ? (body.mustChangePassword ?? true) : false;
 
     const [existing] = await db
       .select()
@@ -131,6 +150,14 @@ export async function POST(req: NextRequest) {
 
     const userId = signUpRes.user.id;
 
+    // Delete the temporary session created by signUpEmail so the current Admin's session is unaffected
+    if (signUpRes.token) {
+      const baseTok = signUpRes.token.includes(".")
+        ? signUpRes.token.split(".")[0]
+        : signUpRes.token;
+      await db.delete(sessionTable).where(eq(sessionTable.token, baseTok));
+    }
+
     const [createdUser] = await db
       .update(userTable)
       .set({
@@ -152,6 +179,7 @@ export async function POST(req: NextRequest) {
             ? adminPermissions ||
               "User verification, booking dispatch & escrow support"
             : null,
+        mustChangePassword: enforceAdminPasswordReset,
         updatedAt: new Date(),
       })
       .where(eq(userTable.id, userId))
@@ -163,6 +191,7 @@ export async function POST(req: NextRequest) {
       role,
       city: resolvedCity,
       adminRoleTitle: adminRoleTitle || "Operations Coordinator",
+      temporaryPassword: enforceAdminPasswordReset ? resolvedPassword : undefined,
     });
 
     return NextResponse.json({ data: createdUser }, { status: 201 });
@@ -180,13 +209,20 @@ export async function POST(req: NextRequest) {
 
 /**
  * PATCH /api/v1/users
- * Updates user details, role, permissions, or account status in NeonDB.
+ * Updates single or multiple users' details, role, permissions, or account status (Admin only).
  */
 export async function PATCH(req: NextRequest) {
   try {
+    const blocked = await protectMutationApi(req);
+    if (blocked) return blocked;
+
+    const adminGuard = await requireAdmin(req);
+    if (!adminGuard.ok) return adminGuard.response;
+
     const body = await req.json();
     const {
       id,
+      ids,
       name,
       email,
       phone,
@@ -202,11 +238,32 @@ export async function PATCH(req: NextRequest) {
       banReason,
     } = body;
 
-    if (!id) {
+    const targetIds: string[] = Array.isArray(ids)
+      ? ids.map(String)
+      : id
+        ? [String(id)]
+        : [];
+
+    if (targetIds.length === 0) {
       return NextResponse.json(
-        { error: "User id is required" },
+        { error: "User id or ids array is required" },
         { status: 400 }
       );
+    }
+
+    if (
+      typeof role === "string" &&
+      normalizeUserRole(role) === "admin"
+    ) {
+      const superGuard = await requireAdmin(req, ["super_admin"]);
+      if (!superGuard.ok) return superGuard.response;
+    }
+    if (
+      typeof adminRoleTitle === "string" ||
+      typeof adminPermissions === "string"
+    ) {
+      const superGuard = await requireAdmin(req, ["super_admin"]);
+      if (!superGuard.ok) return superGuard.response;
     }
 
     const updateValues: Partial<typeof userTable.$inferInsert> = {
@@ -225,6 +282,11 @@ export async function PATCH(req: NextRequest) {
     }
     if (typeof accountStatus === "string") {
       updateValues.accountStatus = accountStatus;
+      if (accountStatus === "suspended") {
+        updateValues.banned = true;
+      } else if (accountStatus === "active" || accountStatus === "verified") {
+        updateValues.banned = false;
+      }
     }
     if (typeof onboardingStatus === "string") {
       updateValues.onboardingStatus = onboardingStatus;
@@ -245,43 +307,71 @@ export async function PATCH(req: NextRequest) {
       updateValues.banReason = banReason;
     }
 
-    const [updated] = await db
+    const updatedRows = await db
       .update(userTable)
       .set(updateValues)
-      .where(eq(userTable.id, String(id)))
+      .where(
+        targetIds.length === 1
+          ? eq(userTable.id, targetIds[0])
+          : inArray(userTable.id, targetIds)
+      )
       .returning();
 
-    return NextResponse.json({ data: updated });
+    return NextResponse.json({
+      data: targetIds.length === 1 ? updatedRows[0] : updatedRows,
+    });
   } catch (error) {
     console.error("PATCH /api/v1/users error:", error);
     return NextResponse.json(
-      { error: "Failed to update user in NeonDB" },
+      { error: "Failed to update user" },
       { status: 500 }
     );
   }
 }
 
 /**
- * DELETE /api/v1/users?id=...
- * Deletes a user record from NeonDB.
+ * DELETE /api/v1/users?id=... or ?ids=id1,id2
+ * Deletes user record(s) (Admin only).
  */
 export async function DELETE(req: NextRequest) {
   try {
+    const blocked = await protectMutationApi(req);
+    if (blocked) return blocked;
+
+    const adminGuard = await requireAdmin(req);
+    if (!adminGuard.ok) return adminGuard.response;
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
-    if (!id) {
+    const idsParam = searchParams.get("ids");
+    const targetIds = idsParam
+      ? idsParam
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : id
+        ? [id]
+        : [];
+
+    if (targetIds.length === 0) {
       return NextResponse.json(
-        { error: "User id is required" },
+        { error: "User id or ids is required" },
         { status: 400 }
       );
     }
 
-    await db.delete(userTable).where(eq(userTable.id, id));
-    return NextResponse.json({ success: true });
+    await db
+      .delete(userTable)
+      .where(
+        targetIds.length === 1
+          ? eq(userTable.id, targetIds[0])
+          : inArray(userTable.id, targetIds)
+      );
+    return NextResponse.json({ success: true, deletedCount: targetIds.length });
   } catch (error) {
     console.error("DELETE /api/v1/users error:", error);
     return NextResponse.json(
-      { error: "Failed to delete user from NeonDB" },
+      { error: "Failed to delete user" },
       { status: 500 }
     );
   }

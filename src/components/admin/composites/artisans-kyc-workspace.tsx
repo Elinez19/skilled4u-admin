@@ -222,7 +222,7 @@ export function ArtisansKycWorkspace({
         u.adminPermissions ||
         "User verification, booking dispatch & escrow support",
       status: u.accountStatus === "active" ? "active" : "verified",
-      lastActive: "Verified in NeonDB",
+      lastActive: "Verified Account",
     }));
   }, [initialUsers]);
 
@@ -454,6 +454,12 @@ export function ArtisansKycWorkspace({
               isOnline: true,
               kycStatus,
               ninNumber,
+              ninEncrypted: null,
+              ninHash: null,
+              kycSelfieUrl: null,
+              kycIdDocumentUrl: null,
+              kycIdType: "nin_slip",
+              kycRejectionReason: null,
               bankName,
               bankAccountNumber,
               bankAccountName: name,
@@ -496,7 +502,7 @@ export function ArtisansKycWorkspace({
             )
           );
           router.refresh();
-          notifySaved(`Updated customer ${name} in NeonDB`);
+          notifySaved(`Updated customer ${name}`);
         } else {
           const res = await fetch("/api/v1/users", {
             method: "POST",
@@ -524,7 +530,7 @@ export function ArtisansKycWorkspace({
           setCustomers((prev) => [newCustomer, ...prev]);
           setFilter("customers");
           router.refresh();
-          notifySaved(`Added customer ${name} to NeonDB`);
+          notifySaved(`Added customer ${name}`);
         }
         resetForm("customer");
       } else {
@@ -557,7 +563,7 @@ export function ArtisansKycWorkspace({
             )
           );
           router.refresh();
-          notifySaved(`Updated admin ${name} in NeonDB`);
+          notifySaved(`Updated admin ${name}`);
         } else {
           const res = await fetch("/api/v1/users", {
             method: "POST",
@@ -584,7 +590,7 @@ export function ArtisansKycWorkspace({
           setAdmins((prev) => [newAdmin, ...prev]);
           setFilter("admins");
           router.refresh();
-          notifySaved(`Added administrator ${name} to NeonDB`);
+          notifySaved(`Added administrator ${name}`);
         }
         resetForm("admin");
       }
@@ -670,7 +676,7 @@ export function ArtisansKycWorkspace({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, accountStatus: nextStatus }),
     }).catch(() => null);
-    notifySaved("Customer account status updated in NeonDB");
+    notifySaved("Customer account status updated");
   }
 
   async function deleteCustomer(id: string) {
@@ -679,7 +685,7 @@ export function ArtisansKycWorkspace({
     await fetch(`/api/v1/users?id=${encodeURIComponent(id)}`, {
       method: "DELETE",
     }).catch(() => null);
-    notifySaved("Customer account removed from NeonDB");
+    notifySaved("Customer account removed");
   }
 
   async function toggleAdminStatus(id: string) {
@@ -693,7 +699,7 @@ export function ArtisansKycWorkspace({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, accountStatus: nextStatus }),
     }).catch(() => null);
-    notifySaved("Administrator status updated in NeonDB");
+    notifySaved("Administrator status updated");
   }
 
   async function deleteAdmin(id: string) {
@@ -702,7 +708,7 @@ export function ArtisansKycWorkspace({
     await fetch(`/api/v1/users?id=${encodeURIComponent(id)}`, {
       method: "DELETE",
     }).catch(() => null);
-    notifySaved("Administrator access revoked in NeonDB");
+    notifySaved("Administrator access revoked");
   }
 
   const counts = React.useMemo(
@@ -1111,10 +1117,15 @@ export function ArtisansKycWorkspace({
                     size="xs"
                     className="text-accent-error hover:border-accent-error/40 hover:text-accent-error"
                     onClick={() => {
-                      const count = selectedIds.length;
+                      const idsToDelete = [...selectedIds];
+                      const count = idsToDelete.length;
                       setCustomers((prev) =>
-                        prev.filter((c) => !selectedIds.includes(c.id))
+                        prev.filter((c) => !idsToDelete.includes(c.id))
                       );
+                      fetch(
+                        `/api/v1/users?ids=${encodeURIComponent(idsToDelete.join(","))}`,
+                        { method: "DELETE" }
+                      ).catch(() => null);
                       notifySaved(`Removed ${count} customer record(s)`);
                       setSelectedIds([]);
                     }}
@@ -1468,14 +1479,23 @@ export function ArtisansKycWorkspace({
                     variant="secondary"
                     size="xs"
                     onClick={() => {
+                      const idsToVerify = [...selectedIds];
                       setItems((prev) =>
                         prev.map((a) =>
-                          selectedIds.includes(a.id)
+                          idsToVerify.includes(a.id)
                             ? { ...a, kycStatus: "verified" }
                             : a
                         )
                       );
-                      notifySaved(`Verified KYC for ${selectedIds.length} artisan(s)`);
+                      fetch("/api/v1/artisans", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          ids: idsToVerify,
+                          kycStatus: "verified",
+                        }),
+                      }).catch(() => null);
+                      notifySaved(`Verified KYC for ${idsToVerify.length} artisan(s)`);
                       setSelectedIds([]);
                     }}
                   >
@@ -1487,10 +1507,15 @@ export function ArtisansKycWorkspace({
                     size="xs"
                     className="text-accent-error hover:border-accent-error/40 hover:text-accent-error"
                     onClick={() => {
-                      const count = selectedIds.length;
+                      const idsToDelete = [...selectedIds];
+                      const count = idsToDelete.length;
                       setItems((prev) =>
-                        prev.filter((a) => !selectedIds.includes(a.id))
+                        prev.filter((a) => !idsToDelete.includes(a.id))
                       );
+                      fetch(
+                        `/api/v1/artisans?ids=${encodeURIComponent(idsToDelete.join(","))}`,
+                        { method: "DELETE" }
+                      ).catch(() => null);
                       notifySaved(`Removed ${count} artisan profile(s)`);
                       setSelectedIds([]);
                     }}

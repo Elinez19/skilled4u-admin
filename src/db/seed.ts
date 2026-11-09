@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "./index";
 import { categories, artisans, user as userTable } from "./schema";
 import { auth } from "../lib/auth";
+import { decryptNin, prepareNinStorage } from "../lib/kyc-crypto";
 
 async function ensureAuthUser({
   name,
@@ -178,6 +179,16 @@ async function seed() {
         "Full access: Users, Bookings, Financials, Disputes & Settings",
     },
     {
+      name: "Elijah Ndenwa",
+      email: "elijahndenwa88@gmail.com",
+      phone: "+234 800 754 5534",
+      city: "Abuja (Maitama)",
+      accountStatus: "verified",
+      adminRoleTitle: "Super Administrator",
+      adminPermissions:
+        "Full access: Users, Bookings, Financials, Disputes & Settings",
+    },
+    {
       name: "Funke Oladipo",
       email: "trust@skilled4u.ng",
       phone: "+234 809 112 4401",
@@ -302,11 +313,26 @@ async function seed() {
       accountStatus: isVerified ? "verified" : "pending",
     });
 
+    const rawNin =
+      decryptNin(art.ninEncrypted) ||
+      (art.ninNumber && /^\d{11}$/.test(art.ninNumber)
+        ? art.ninNumber
+        : "48192038471");
+    const ninPrepared = prepareNinStorage(rawNin);
+
     await db
       .update(artisans)
       .set({
         userId: linkedUserId,
-        ninNumber: art.ninNumber || "48192038471",
+        ninNumber: ninPrepared.ninMasked,
+        ninEncrypted: ninPrepared.ninEncrypted,
+        ninHash: ninPrepared.ninHash,
+        kycSelfieUrl:
+          art.kycSelfieUrl || "https://randomuser.me/api/portraits/men/32.jpg",
+        kycIdDocumentUrl:
+          art.kycIdDocumentUrl ||
+          "https://skilled4u.com/images/landing/hero-artisan.png",
+        kycIdType: art.kycIdType || "nin_slip",
         bankName: art.bankName || "Access Bank",
         bankAccountNumber: art.bankAccountNumber || "0148291042",
         bankAccountName: art.bankAccountName || art.name,

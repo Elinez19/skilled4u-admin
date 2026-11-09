@@ -37,7 +37,13 @@ export const artisans = pgTable("artisans", {
   longitude: doublePrecision("longitude").notNull().default(3.4723),
   isOnline: boolean("is_online").notNull().default(true),
   kycStatus: text("kyc_status").notNull().default("verified"), // "pending" | "verified" | "rejected"
-  ninNumber: text("nin_number"),
+  ninNumber: text("nin_number"), // Stores masked NIN at rest ("*******4519")
+  ninEncrypted: text("nin_encrypted"), // AES-256-GCM encrypted 11-digit NIN
+  ninHash: text("nin_hash"), // HMAC-SHA256 blind index for duplicate NIN detection
+  kycSelfieUrl: text("kyc_selfie_url"),
+  kycIdDocumentUrl: text("kyc_id_document_url"),
+  kycIdType: text("kyc_id_type"),
+  kycRejectionReason: text("kyc_rejection_reason"),
   bankName: text("bank_name"),
   bankAccountNumber: text("bank_account_number"),
   bankAccountName: text("bank_account_name"),

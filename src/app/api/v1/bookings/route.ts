@@ -1,14 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
+import { desc, eq } from "drizzle-orm";
+import { normalizeUserRole, requireAuth } from "@/lib/auth-guard";
+import { protectMutationApi } from "@/lib/arcjet";
 import { db } from "@/db";
 import { bookings } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const rows = await db
-      .select()
-      .from(bookings)
-      .orderBy(desc(bookings.createdAt));
+    const guard = await requireAuth(req);
+    if (!guard.ok) return guard.response;
+
+    const { user } = guard.auth;
+    const role = normalizeUserRole(user.role);
+
+    const rows =
+      role === "admin"
+        ? await db
+            .select()
+            .from(bookings)
+            .orderBy(desc(bookings.createdAt))
+        : await db
+            .select()
+            .from(bookings)
+            .where(eq(bookings.clientEmail, user.email))
+            .orderBy(desc(bookings.createdAt));
+
     return NextResponse.json({ data: rows });
   } catch (error) {
     console.error("GET /api/v1/bookings error:", error);
@@ -21,6 +37,12 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const blocked = await protectMutationApi(req);
+    if (blocked) return blocked;
+
+    const guard = await requireAuth(req);
+    if (!guard.ok) return guard.response;
+
     const body = await req.json();
     const {
       clientName,
@@ -37,7 +59,13 @@ export async function POST(req: NextRequest) {
       agreedAmount,
     } = body;
 
-    if (!clientName || !artisanId || !serviceTitle || !agreedAmount) {
+    const resolvedClientName = clientName || guard.auth.user.name;
+    const resolvedClientEmail =
+      normalizeUserRole(guard.auth.user.role) === "admin" && clientEmail
+        ? clientEmail
+        : guard.auth.user.email;
+
+    if (!resolvedClientName || !artisanId || !serviceTitle || !agreedAmount) {
       return NextResponse.json(
         { error: "Missing required booking fields" },
         { status: 400 }
@@ -52,9 +80,10 @@ export async function POST(req: NextRequest) {
       .values({
         id,
         bookingCode,
-        clientName,
-        clientEmail: clientEmail || "client@skilled4u.ng",
-        clientPhone: clientPhone || "+234 800 000 0000",
+        clientName: resolvedClientName,
+        clientEmail: resolvedClientEmail,
+        clientPhone:
+          clientPhone || guard.auth.user.phone || "+234 800 000 0000",
         artisanId,
         artisanName: artisanName || "Skilled4U Pro",
         categoryId: categoryId || null,
@@ -63,7 +92,7 @@ export async function POST(req: NextRequest) {
         status: "pending",
         scheduledDate: scheduledDate || new Date().toISOString().split("T")[0],
         scheduledTime: scheduledTime || "10:00 AM",
-        address: address || "Lekki Phase 1, Lagos",
+        address: address || guard.auth.user.address || "Abuja (Wuse II)",
         agreedAmount: Number(agreedAmount),
         paymentStatus: "unpaid",
       })
@@ -81,6 +110,12 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    const blocked = await protectMutationApi(req);
+    if (blocked) return blocked;
+
+    const guard = await requireAuth(req);
+    if (!guard.ok) return guard.response;
+
     const body = await req.json();
     const { id, status, paymentStatus } = body;
 
@@ -91,11 +126,15 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
+    const isAdmin = normalizeUserRole(guard.auth.user.role) === "admin";
     const updateData: Partial<typeof bookings.$inferInsert> = {
       updatedAt: new Date(),
     };
     if (status) updateData.status = status;
-    if (paymentStatus) updateData.paymentStatus = paymentStatus;
+    // Only Admins may directly mutate paymentStatus on a booking
+    if (paymentStatus && isAdmin) {
+      updateData.paymentStatus = paymentStatus;
+    }
 
     const [updated] = await db
       .update(bookings)
@@ -112,4 +151,3 @@ export async function PATCH(req: NextRequest) {
     );
   }
 }
-

@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
-import { normalizeUserRole } from "@/lib/auth-guard";
+import {
+  applyRoleSessionPolicy,
+  normalizeUserRole,
+  requireAdmin,
+} from "@/lib/auth-guard";
+import { prepareNinStorage } from "@/lib/kyc-crypto";
+import { protectRegistration } from "@/lib/arcjet";
+import { registerSchema } from "@/lib/validators/auth";
 import { db } from "@/db";
-import { artisans, user as userTable, type ArtisanRow } from "@/db/schema";
+import {
+  artisans,
+  session as sessionTable,
+  user as userTable,
+  type ArtisanRow,
+} from "@/db/schema";
 import { sendWelcomeOnboardingEmail } from "@/lib/resend";
 
 /**
@@ -11,55 +23,75 @@ import { sendWelcomeOnboardingEmail } from "@/lib/resend";
  * Unified registration endpoint for:
  * - Customer Mobile App (`role: "client"` or `"customer"`)
  * - Artisan Mobile App (`role: "artisan"`)
- * - Web Admin Portal (`role: "admin"`)
+ * - Web Admin Portal (`role: "admin"` — strictly restricted to authenticated Super Admins)
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const parsed = registerSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error:
+            parsed.error.issues[0]?.message ||
+            "Name, valid email, and password (min 6 characters) are required",
+          code: "VALIDATION_ERROR",
+        },
+        { status: 400 }
+      );
+    }
+
     const {
       name,
-      email,
+      email: normalizedEmail,
       password,
       role: rawRole,
       phone,
       city,
       address,
-      // Artisan optional initial fields
       trade,
       categoryId,
       hourlyRateNumeric,
-      about,
-      skills,
-      ninNumber,
-      bankName,
-      bankAccountNumber,
-      // Admin optional initial fields
       adminRoleTitle,
-      adminPermissions,
-    } = body;
+      mustChangePassword,
+    } = parsed.data;
 
-    if (!name || !email || !password) {
-      return NextResponse.json(
-        { error: "Name, email, and password are required" },
-        { status: 400 }
-      );
+    const role = normalizeUserRole(rawRole);
+
+    // SECURITY FIX S1 & RBAC: Block public self-registration of Admins; require an active Super Admin session
+    if (role === "admin") {
+      const adminGuard = await requireAdmin(req, ["super_admin"]);
+      if (!adminGuard.ok) {
+        return adminGuard.response;
+      }
     }
 
-    const normalizedEmail = String(email).trim().toLowerCase();
-    const role = normalizeUserRole(rawRole);
+    // Arcjet registration protection (disposable email blocking + sliding window rate limit)
+    const blocked = await protectRegistration(req, normalizedEmail);
+    if (blocked) return blocked;
+
     const resolvedCity = city || "Abuja (Wuse II)";
     const resolvedPhone = phone || "+234 803 000 0000";
+    const resolvedPermissions = Array.isArray(body.adminPermissions)
+      ? JSON.stringify(body.adminPermissions)
+      : typeof body.adminPermissions === "string"
+        ? body.adminPermissions
+        : "User verification, booking dispatch & escrow support";
 
-    // Check if email already exists
+    // Check if email already exists (enforces 1-Email-1-Role across all platforms)
     const [existing] = await db
-      .select({ id: userTable.id })
+      .select({ id: userTable.id, role: userTable.role })
       .from(userTable)
       .where(eq(userTable.email, normalizedEmail))
       .limit(1);
 
     if (existing) {
       return NextResponse.json(
-        { error: "An account with this email address already exists" },
+        {
+          error: `An account with this email address already exists (${normalizeUserRole(existing.role)} role). Each email is strictly bound to one account.`,
+          code: "EMAIL_ALREADY_EXISTS",
+        },
         { status: 409 }
       );
     }
@@ -67,8 +99,10 @@ export async function POST(req: NextRequest) {
     const initialOnboardingStatus =
       role === "admin" ? "completed" : "in_progress";
     const initialOnboardingStep = role === "admin" ? 5 : 1;
+    const enforceAdminPasswordReset =
+      role === "admin" ? (mustChangePassword ?? true) : false;
 
-    // Register via Better Auth so password hashing (scrypt), session token, and 6-digit OTP email are handled natively
+    // Register via Better Auth so password hashing (scrypt) and session creation happen natively
     const signUpResult = await auth.api.signUpEmail({
       body: {
         name: String(name).trim(),
@@ -79,16 +113,19 @@ export async function POST(req: NextRequest) {
         address: address || resolvedCity,
         onboardingStatus: initialOnboardingStatus,
         onboardingStep: initialOnboardingStep,
-        accountStatus: role === "admin" ? "verified" : "active",
+        accountStatus:
+          role === "admin"
+            ? "verified"
+            : role === "artisan"
+              ? "pending"
+              : "active",
         adminRoleTitle:
           role === "admin"
             ? adminRoleTitle || "Operations Administrator"
             : undefined,
         adminPermissions:
-          role === "admin"
-            ? adminPermissions ||
-              "User verification, booking dispatch & escrow support"
-            : undefined,
+          role === "admin" ? resolvedPermissions : undefined,
+        mustChangePassword: enforceAdminPasswordReset,
       },
     });
 
@@ -101,7 +138,16 @@ export async function POST(req: NextRequest) {
 
     const createdUserId = signUpResult.user.id;
 
-    // Ensure role & additional fields are persisted on user table (in case admin plugin defaultRole overrode role)
+    // When a Super Admin provisions another Admin, revoke the auto-created signUp session
+    // so the new Admin must complete 2-step MFA + forced password rotation on their own login
+    if (role === "admin" && signUpResult.token) {
+      const baseTok = signUpResult.token.includes(".")
+        ? signUpResult.token.split(".")[0]
+        : signUpResult.token;
+      await db.delete(sessionTable).where(eq(sessionTable.token, baseTok));
+    }
+
+    // Ensure role & additional fields are persisted on user table
     const [updatedUser] = await db
       .update(userTable)
       .set({
@@ -111,21 +157,29 @@ export async function POST(req: NextRequest) {
         address: address || resolvedCity,
         onboardingStatus: initialOnboardingStatus,
         onboardingStep: initialOnboardingStep,
-        accountStatus: role === "admin" ? "verified" : "active",
+        accountStatus:
+          role === "admin"
+            ? "verified"
+            : role === "artisan"
+              ? "pending"
+              : "active",
         adminRoleTitle:
           role === "admin"
             ? adminRoleTitle || "Operations Administrator"
             : null,
-        adminPermissions:
-          role === "admin"
-            ? adminPermissions ||
-              "User verification, booking dispatch & escrow support"
-            : null,
-        emailVerified: role === "admin" ? true : false,
+        adminPermissions: role === "admin" ? resolvedPermissions : null,
+        mustChangePassword: enforceAdminPasswordReset,
+        emailVerified: role === "admin",
         updatedAt: new Date(),
       })
       .where(eq(userTable.id, createdUserId))
       .returning();
+
+    // Stamp role-specific session timeout (Artisan: 7d max / 24h idle; Client: 30d max / 7d idle)
+    const sessionPolicy =
+      role !== "admin" && signUpResult.token
+        ? await applyRoleSessionPolicy(signUpResult.token, role)
+        : null;
 
     let artisanProfile: ArtisanRow | null = null;
 
@@ -140,6 +194,10 @@ export async function POST(req: NextRequest) {
       const resolvedTrade = trade || "General Skilled Specialist";
       const rateNum = Number(hourlyRateNumeric) || 15000;
       const formattedRate = `₦${rateNum.toLocaleString()}`;
+      const ninPrepared =
+        typeof body.ninNumber === "string" && /^\d{11}$/.test(body.ninNumber.trim())
+          ? prepareNinStorage(body.ninNumber.trim())
+          : null;
 
       if (existingArtisanByEmail) {
         const [linked] = await db
@@ -149,6 +207,13 @@ export async function POST(req: NextRequest) {
             name: String(name).trim(),
             phone: resolvedPhone,
             city: resolvedCity,
+            ...(ninPrepared
+              ? {
+                  ninNumber: ninPrepared.ninMasked,
+                  ninEncrypted: ninPrepared.ninEncrypted,
+                  ninHash: ninPrepared.ninHash,
+                }
+              : {}),
             updatedAt: new Date(),
           })
           .where(eq(artisans.id, existingArtisanByEmail.id))
@@ -176,11 +241,12 @@ export async function POST(req: NextRequest) {
             hourlyRate: formattedRate,
             hourlyRateNumeric: rateNum,
             about:
-              about ||
+              body.about ||
               `Verified ${resolvedTrade} specialist serving ${resolvedCity}.`,
-            skills: Array.isArray(skills) && skills.length > 0
-              ? skills
-              : [resolvedTrade, "Diagnostics & Repair"],
+            skills:
+              Array.isArray(body.skills) && body.skills.length > 0
+                ? body.skills
+                : [resolvedTrade, "Diagnostics & Repair"],
             portfolioImages: ["/images/landing/hero-artisan.png"],
             rating: 5.0,
             reviewsCount: 0,
@@ -190,9 +256,11 @@ export async function POST(req: NextRequest) {
             address: address || resolvedCity,
             isOnline: true,
             kycStatus: "pending",
-            ninNumber: ninNumber || null,
-            bankName: bankName || null,
-            bankAccountNumber: bankAccountNumber || null,
+            ninNumber: ninPrepared ? ninPrepared.ninMasked : null,
+            ninEncrypted: ninPrepared ? ninPrepared.ninEncrypted : null,
+            ninHash: ninPrepared ? ninPrepared.ninHash : null,
+            bankName: body.bankName || null,
+            bankAccountNumber: body.bankAccountNumber || null,
             bankAccountName: String(name).trim(),
           })
           .returning();
@@ -207,6 +275,7 @@ export async function POST(req: NextRequest) {
         name: String(name).trim(),
         role: "admin",
         adminRoleTitle: adminRoleTitle || "Operations Administrator",
+        temporaryPassword: enforceAdminPasswordReset ? String(password) : undefined,
       });
     } else {
       await auth.api.sendVerificationOTP({
@@ -219,19 +288,23 @@ export async function POST(req: NextRequest) {
 
     const nextStep =
       role === "admin"
-        ? "completed"
+        ? enforceAdminPasswordReset
+          ? "admin_mfa_and_password_rotation"
+          : "completed"
         : "verify_email_otp";
 
     return NextResponse.json(
       {
         data: {
           user: updatedUser,
-          token: signUpResult.token || null,
+          token: role === "admin" ? null : signUpResult.token || null,
+          sessionPolicy,
           artisanProfile,
           onboarding: {
             role,
             status: updatedUser.onboardingStatus,
             step: updatedUser.onboardingStep,
+            mustChangePassword: updatedUser.mustChangePassword,
             nextStep,
           },
           verificationEmailSent: true,

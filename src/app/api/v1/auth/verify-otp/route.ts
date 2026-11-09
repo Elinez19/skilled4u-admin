@@ -1,37 +1,102 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
+import {
+  applyRoleSessionPolicy,
+  buildOnboardingChecklist,
+  normalizeUserRole,
+  resolveAdminScope,
+  verifyAdminMfaChallengeToken,
+  verifyPortalRoleMatch,
+} from "@/lib/auth-guard";
+import { signBetterAuthSessionToken } from "@/lib/google-oauth";
+import { protectOtpEndpoint } from "@/lib/arcjet";
+import { verifyOtpSchema } from "@/lib/validators/auth";
 import { db } from "@/db";
-import { user as userTable } from "@/db/schema";
+import {
+  session as sessionTable,
+  user as userTable,
+} from "@/db/schema";
+import { sendWelcomeOnboardingEmail } from "@/lib/resend";
 
 /**
  * POST /api/v1/auth/verify-otp
- * Unified 6-digit Email OTP handler for Web Admin, Artisan Mobile App, and Customer Mobile App.
- * Actions:
- * - "send": Dispatches a 6-digit OTP via Resend (`type`: "email-verification" | "sign-in" | "forget-password")
- * - "verify-email": Verifies email ownership with 6-digit OTP and advances onboarding step
- * - "sign-in": Passwordless sign-in with 6-digit OTP (returns user + bearer token)
- * - "reset-password": Resets account password using 6-digit OTP
+ * Unified 6-digit Email OTP handler for:
+ * - Web Admin Portal Mandatory Step-Up MFA (`action: "admin-mfa"`)
+ * - Artisan & Customer Mobile App Email Verification (`action: "verify-email"`)
+ * - Mobile Passwordless OTP Sign-In (`action: "sign-in"`)
+ * - Password Reset with Full Session Revocation (`action: "reset-password"`)
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const {
-      action = "verify-email",
-      email,
-      otp,
-      type = "email-verification",
-      password,
-    } = body;
+    const body = await req.json().catch(() => ({}));
+    const parsed = verifyOtpSchema.safeParse({
+      ...body,
+      newPassword: body.newPassword ?? body.password,
+    });
 
-    if (!email) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Email address is required" },
+        {
+          error:
+            parsed.error.issues[0]?.message ||
+            "Valid email address and OTP parameters are required",
+          code: "VALIDATION_ERROR",
+        },
         { status: 400 }
       );
     }
 
-    const normalizedEmail = String(email).trim().toLowerCase();
+    const {
+      action,
+      email: normalizedEmail,
+      otp,
+      type = "email-verification",
+      mfaChallengeToken,
+      portal,
+      newPassword,
+    } = parsed.data;
+
+    // 1. Arcjet + Sliding Window OTP Rate Limit (prevents 6-digit OTP brute force & email bombing)
+    const blocked = await protectOtpEndpoint(req, normalizedEmail, action);
+    if (blocked) return blocked;
+
+    // 2. Check user standing and 1-Email-1-Role portal isolation if account exists
+    const [existingUser] = await db
+      .select()
+      .from(userTable)
+      .where(eq(userTable.email, normalizedEmail))
+      .limit(1);
+
+    if (
+      existingUser &&
+      (existingUser.banned || existingUser.accountStatus === "suspended")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "This account has been suspended. Please contact Skilled4U Trust & Safety.",
+          code: "ACCOUNT_SUSPENDED",
+        },
+        { status: 403 }
+      );
+    }
+
+    if (existingUser && portal) {
+      const portalMatch = verifyPortalRoleMatch({
+        userRole: normalizeUserRole(existingUser.role),
+        portal,
+      });
+      if (!portalMatch.ok) {
+        return NextResponse.json(
+          {
+            error: portalMatch.error,
+            code: portalMatch.code,
+          },
+          { status: portalMatch.status }
+        );
+      }
+    }
 
     if (action === "send") {
       const result = await auth.api.sendVerificationOTP({
@@ -57,18 +122,14 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      const wasAlreadyVerified = Boolean(existingUser?.emailVerified);
+
       const result = await auth.api.verifyEmailOTP({
         body: {
           email: normalizedEmail,
           otp: String(otp).trim(),
         },
       });
-
-      const [existingUser] = await db
-        .select()
-        .from(userTable)
-        .where(eq(userTable.email, normalizedEmail))
-        .limit(1);
 
       let updatedUser = existingUser;
       if (existingUser) {
@@ -89,10 +150,32 @@ export async function POST(req: NextRequest) {
         updatedUser = saved;
       }
 
+      let welcomeEmailSent = false;
+      const targetUserForWelcome = updatedUser || result.user;
+      if (targetUserForWelcome && !wasAlreadyVerified) {
+        const welcomeRole = normalizeUserRole(updatedUser?.role);
+        const welcomeRes = await sendWelcomeOnboardingEmail({
+          to: targetUserForWelcome.email,
+          name: targetUserForWelcome.name || "Valued Member",
+          role: welcomeRole,
+          city: updatedUser?.city || undefined,
+        });
+        welcomeEmailSent = welcomeRes.success;
+      }
+
+      const sessionPolicy =
+        result.token && updatedUser
+          ? await applyRoleSessionPolicy(result.token, updatedUser.role, {
+              revokeOtherArtisanSessions: false,
+            })
+          : null;
+
       return NextResponse.json({
         data: {
           verified: true,
+          welcomeEmailSent,
           token: result.token || null,
+          sessionPolicy,
           user: updatedUser || result.user,
           onboarding: updatedUser
             ? {
@@ -111,12 +194,166 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Web Admin Two-Step MFA Verification (requires valid 5-minute mfaChallengeToken + 6-digit OTP)
+    if (action === "admin-mfa") {
+      if (!otp) {
+        return NextResponse.json(
+          { error: "6-digit OTP code is required", code: "MISSING_OTP" },
+          { status: 400 }
+        );
+      }
+
+      const challengeCheck = verifyAdminMfaChallengeToken(
+        mfaChallengeToken,
+        normalizedEmail
+      );
+      if (!challengeCheck.ok) {
+        return NextResponse.json(
+          {
+            error: challengeCheck.error,
+            code: "INVALID_MFA_CHALLENGE",
+          },
+          { status: 401 }
+        );
+      }
+
+      if (!existingUser || normalizeUserRole(existingUser.role) !== "admin") {
+        return NextResponse.json(
+          {
+            error: "Forbidden: Administrator account required.",
+            code: "FORBIDDEN_PORTAL",
+          },
+          { status: 403 }
+        );
+      }
+
+      const baResponse = await auth.api.signInEmailOTP({
+        body: {
+          email: normalizedEmail,
+          otp: String(otp).trim(),
+        },
+        headers: req.headers,
+        asResponse: true,
+      });
+
+      if (!baResponse.ok) {
+        const errBody = await baResponse.json().catch(() => ({}));
+        return NextResponse.json(
+          {
+            error:
+              (errBody as { message?: string })?.message ||
+              "Invalid or expired 6-digit verification code.",
+            code: "INVALID_OTP",
+          },
+          { status: 401 }
+        );
+      }
+
+      const otpSignInData = (await baResponse.json()) as {
+        token?: string;
+        user?: { id: string; email: string };
+      };
+      const rawToken = otpSignInData.token || "";
+
+      if (!rawToken) {
+        return NextResponse.json(
+          {
+            error: "Failed to issue Administrator session after OTP verification.",
+            code: "SESSION_ISSUE_FAILED",
+          },
+          { status: 500 }
+        );
+      }
+
+      const sessionPolicy = await applyRoleSessionPolicy(rawToken, "admin");
+      const baseToken = rawToken.includes(".")
+        ? rawToken.split(".")[0]
+        : rawToken;
+      const [sessionRow] = await db
+        .select()
+        .from(sessionTable)
+        .where(eq(sessionTable.token, baseToken))
+        .limit(1);
+
+      const onboardingChecklist = buildOnboardingChecklist(existingUser, null);
+
+      const response = NextResponse.json({
+        data: {
+          verified: true,
+          mfaCompleted: true,
+          mustChangePassword: Boolean(existingUser.mustChangePassword),
+          adminScope: resolveAdminScope(existingUser),
+          token: rawToken,
+          user: existingUser,
+          session: sessionRow
+            ? {
+                id: sessionRow.id,
+                token: sessionRow.token,
+                userId: sessionRow.userId,
+                expiresAt: sessionPolicy.expiresAt,
+                updatedAt: sessionRow.updatedAt,
+              }
+            : null,
+          sessionPolicy,
+          onboardingChecklist,
+        },
+      });
+
+      const setCookieHeaders =
+        typeof baResponse.headers.getSetCookie === "function"
+          ? baResponse.headers.getSetCookie()
+          : [];
+
+      if (setCookieHeaders.length > 0) {
+        for (const cookieStr of setCookieHeaders) {
+          const updatedCookie = cookieStr.replace(
+            /Max-Age=\d+/i,
+            `Max-Age=${sessionPolicy.maxAgeSeconds}`
+          );
+          response.headers.append("Set-Cookie", updatedCookie);
+        }
+      } else {
+        const isHttps = req.nextUrl.protocol === "https:";
+        response.cookies.set(
+          "better-auth.session_token",
+          signBetterAuthSessionToken(rawToken),
+          {
+            httpOnly: true,
+            sameSite: "lax",
+            secure: isHttps,
+            path: "/",
+            maxAge: sessionPolicy.maxAgeSeconds,
+          }
+        );
+      }
+
+      return response;
+    }
+
     if (action === "sign-in") {
       if (!otp) {
         return NextResponse.json(
           { error: "6-digit OTP code is required" },
           { status: 400 }
         );
+      }
+
+      // Prevent bypassing Admin Step 1 password check via direct OTP sign-in without an mfaChallengeToken
+      if (existingUser && normalizeUserRole(existingUser.role) === "admin") {
+        const challengeCheck = verifyAdminMfaChallengeToken(
+          mfaChallengeToken,
+          normalizedEmail
+        );
+        if (!challengeCheck.ok) {
+          return NextResponse.json(
+            {
+              error:
+                "Administrators must verify their password first before completing 6-digit OTP sign-in.",
+              code: "ADMIN_PASSWORD_STEP_REQUIRED",
+            },
+            { status: 403 }
+          );
+        }
       }
 
       const result = await auth.api.signInEmailOTP({
@@ -132,16 +369,22 @@ export async function POST(req: NextRequest) {
         .where(eq(userTable.email, normalizedEmail))
         .limit(1);
 
+      const sessionPolicy =
+        result.token && dbUser
+          ? await applyRoleSessionPolicy(result.token, dbUser.role)
+          : null;
+
       return NextResponse.json({
         data: {
           token: result.token,
+          sessionPolicy,
           user: dbUser || result.user,
         },
       });
     }
 
     if (action === "reset-password") {
-      if (!otp || !password) {
+      if (!otp || !newPassword) {
         return NextResponse.json(
           { error: "Both 6-digit OTP code and new password are required" },
           { status: 400 }
@@ -152,14 +395,29 @@ export async function POST(req: NextRequest) {
         body: {
           email: normalizedEmail,
           otp: String(otp).trim(),
-          password: String(password),
+          password: String(newPassword),
         },
       });
+
+      // Security best practice: revoke all existing sessions across all devices on password reset
+      if (existingUser) {
+        await db
+          .delete(sessionTable)
+          .where(eq(sessionTable.userId, existingUser.id));
+        await db
+          .update(userTable)
+          .set({
+            mustChangePassword: false,
+            updatedAt: new Date(),
+          })
+          .where(eq(userTable.id, existingUser.id));
+      }
 
       return NextResponse.json({
         data: {
           success: result.success,
           email: normalizedEmail,
+          sessionsRevoked: true,
         },
       });
     }
@@ -181,4 +439,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

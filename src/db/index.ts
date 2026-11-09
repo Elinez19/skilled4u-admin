@@ -4,15 +4,19 @@ import { neon, neonConfig } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "./schema";
 
-// Prefer IPv4 and increase Node's Happy Eyeballs attempt timeout (default 250ms is too low for cross-continent TLS to us-east-2)
+// Prefer IPv4 and increase Node's Happy Eyeballs attempt timeout for cross-continent TLS to us-east-2
 dns.setDefaultResultOrder("ipv4first");
 if (typeof net.setDefaultAutoSelectFamilyAttemptTimeout === "function") {
   net.setDefaultAutoSelectFamilyAttemptTimeout(5000);
 }
 
-// Configure a dedicated c-ares DNS resolver with public DNS servers + in-memory cache
-// to prevent Windows OS getaddrinfo (192.168.1.1) from failing with EAI_AGAIN under concurrent queries.
-const neonDnsResolver = new dns.promises.Resolver();
+const originalLookup = dns.lookup.bind(dns);
+
+// Dedicated public DNS fallback resolver when local router DNS returns EAI_AGAIN
+const neonDnsResolver = new dns.promises.Resolver({
+  timeout: 2500,
+  tries: 2,
+});
 try {
   neonDnsResolver.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4", "1.0.0.1"]);
 } catch {
@@ -22,7 +26,43 @@ try {
 const DNS_CACHE_TTL_MS = 10 * 60 * 1000;
 const neonDnsCache = new Map<string, { ips: string[]; expiresAt: number }>();
 const neonDnsInflight = new Map<string, Promise<string[]>>();
-const FALLBACK_NEON_IPS = ["3.142.41.151", "3.14.138.241"];
+
+function lookupViaOs(hostname: string): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error("OS_DNS_TIMEOUT"));
+    }, 2500);
+
+    originalLookup(
+      hostname,
+      { family: 4, all: true },
+      (err, addresses) => {
+        clearTimeout(timer);
+        if (err) {
+          reject(err);
+          return;
+        }
+        if (Array.isArray(addresses) && addresses.length > 0) {
+          resolve(addresses.map((a) => (typeof a === "string" ? a : a.address)));
+        } else if (typeof addresses === "string") {
+          resolve([addresses]);
+        } else {
+          reject(new Error("EMPTY_DNS_RESULT"));
+        }
+      }
+    );
+  });
+}
+
+function sortNeonIps(ips: string[]): string[] {
+  return [...ips].sort((a, b) =>
+    a.startsWith("3.") === b.startsWith("3.")
+      ? 0
+      : a.startsWith("3.")
+        ? -1
+        : 1
+  );
+}
 
 async function resolveNeonHost(hostname: string): Promise<string[]> {
   const now = Date.now();
@@ -37,17 +77,11 @@ async function resolveNeonHost(hostname: string): Promise<string[]> {
   }
 
   const promise = (async () => {
+    // 1. Try fast OS DNS cache first (2.5s cap)
     try {
-      const ips = await neonDnsResolver.resolve4(hostname);
-      // Prioritize low-latency AWS us-east-2 IPs (3.*) over slower secondary routes
-      const sorted = [...ips].sort((a, b) =>
-        a.startsWith("3.") === b.startsWith("3.")
-          ? 0
-          : a.startsWith("3.")
-            ? -1
-            : 1
-      );
-      if (sorted.length > 0) {
+      const osIps = await lookupViaOs(hostname);
+      if (osIps.length > 0) {
+        const sorted = sortNeonIps(osIps);
         neonDnsCache.set(hostname, {
           ips: sorted,
           expiresAt: Date.now() + DNS_CACHE_TTL_MS,
@@ -55,9 +89,28 @@ async function resolveNeonHost(hostname: string): Promise<string[]> {
         return sorted;
       }
     } catch {
-      // Fallback to known Neon US-East-2 proxy IPs when local DNS times out
+      // Fall through to c-ares public DNS resolver
     }
-    return FALLBACK_NEON_IPS;
+
+    // 2. Fallback to c-ares public DNS (8.8.8.8 / 1.1.1.1)
+    try {
+      const resolverIps = await neonDnsResolver.resolve4(hostname);
+      if (resolverIps.length > 0) {
+        const sorted = sortNeonIps(resolverIps);
+        neonDnsCache.set(hostname, {
+          ips: sorted,
+          expiresAt: Date.now() + DNS_CACHE_TTL_MS,
+        });
+        return sorted;
+      }
+    } catch {
+      // If cached stale IPs exist, return them
+      if (cached?.ips?.length) {
+        return cached.ips;
+      }
+    }
+
+    throw new Error(`Unable to resolve Neon host: ${hostname}`);
   })().finally(() => {
     neonDnsInflight.delete(hostname);
   });
@@ -72,13 +125,22 @@ const globalForDns = globalThis as unknown as {
 
 if (!globalForDns.__neonDnsPatched) {
   globalForDns.__neonDnsPatched = true;
-  const originalLookup = dns.lookup.bind(dns);
 
   // @ts-expect-error -- Node dns.lookup has multiple overload signatures
   dns.lookup = function patchedNeonLookup(
     hostname: string,
-    options: dns.LookupOptions | ((err: NodeJS.ErrnoException | null, address: string | dns.LookupAddress[], family?: number) => void),
-    callback?: (err: NodeJS.ErrnoException | null, address: string | dns.LookupAddress[], family?: number) => void
+    options:
+      | dns.LookupOptions
+      | ((
+          err: NodeJS.ErrnoException | null,
+          address: string | dns.LookupAddress[],
+          family?: number
+        ) => void),
+    callback?: (
+      err: NodeJS.ErrnoException | null,
+      address: string | dns.LookupAddress[],
+      family?: number
+    ) => void
   ) {
     let opts: dns.LookupOptions = {};
     let cb = callback;
@@ -153,6 +215,3 @@ const connectionString =
 
 const sql = neon(connectionString);
 export const db = drizzle(sql, { schema });
-
-
-

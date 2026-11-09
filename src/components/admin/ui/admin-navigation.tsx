@@ -6,6 +6,7 @@ import {
   Bell,
   CalendarCheck,
   ChevronRight,
+  Clock,
   CreditCard,
   Headset,
   Layers,
@@ -171,12 +172,16 @@ interface SidebarContentProps {
   pathname: string | null;
   onNavigate?: () => void;
   onSignOut: () => void;
+  adminName?: string;
+  adminRoleTitle?: string;
 }
 
 function SidebarContent({
   pathname,
   onNavigate,
   onSignOut,
+  adminName,
+  adminRoleTitle,
 }: SidebarContentProps) {
   return (
     <div className="surface-sidebar-gloss-white no-scrollbar relative flex h-full w-full flex-col justify-between overflow-y-auto border-r-2 border-brand-100 px-3.5 py-3.5 text-ink-primary">
@@ -286,11 +291,11 @@ function SidebarContent({
               <ShieldCheck className="h-3.5 w-3.5 text-accent-gold" />
             </OffsetRing>
             <div className="min-w-0">
-              <p className="font-display text-[11px] font-extrabold text-brand-950 leading-tight">
-                Admin Portal Active
+              <p className="truncate font-display text-[11px] font-extrabold text-brand-950 leading-tight">
+                {adminName || "Admin Portal Active"}
               </p>
               <p className="truncate text-[10px] font-semibold text-brand-600 leading-tight">
-                Customers · Artisans · Admins
+                {adminRoleTitle || "Customers · Artisans · Admins"}
               </p>
             </div>
           </div>
@@ -641,16 +646,29 @@ export function AdminDashboardNavbar({
   );
 }
 
+const ADMIN_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const ADMIN_WARNING_THRESHOLD_MS = 28 * 60 * 1000; // Warn at 28 minutes (2m before timeout)
+
 /**
  * Dedicated Admin Sidebar Shell with Custom Glossy White Sidebar & Custom Dashboard Navbar
  * Provides a sticky full-height sidebar on desktop (`lg:w-64`) and a slide-over
  * sidebar drawer on mobile devices, paired with the custom dashboard navbar & workspace.
+ * Enforces session verification against /api/v1/auth/me and a 30-minute idle inactivity timeout.
  */
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const currentPath = pathname ?? "";
   const [openOnPath, setOpenOnPath] = React.useState<string | null>(null);
+  const [adminName, setAdminName] = React.useState<string>("Admin Portal Active");
+  const [adminRoleTitle, setAdminRoleTitle] = React.useState<string>(
+    "Customers · Artisans · Admins"
+  );
+  const [idleSecondsRemaining, setIdleSecondsRemaining] = React.useState<
+    number | null
+  >(null);
+  const lastActivityRef = React.useRef<number>(0);
+  const sessionMaxExpiresRef = React.useRef<number | null>(null);
   const mobileOpen = openOnPath === currentPath;
 
   const closeMobileSidebar = React.useCallback(() => {
@@ -661,22 +679,146 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     setOpenOnPath((prev) => (prev === currentPath ? null : currentPath));
   }, [currentPath]);
 
-  const handleSignOut = React.useCallback(async () => {
+  const handleSignOut = React.useCallback(
+    async (reason?: "timeout" | "unauthorized") => {
+      try {
+        await Promise.allSettled([
+          fetch("/api/v1/auth/logout", {
+            method: "POST",
+            credentials: "include",
+          }),
+          authClient.signOut(),
+        ]);
+      } finally {
+        closeMobileSidebar();
+        const target = reason ? `/login?reason=${reason}` : "/login";
+        router.push(target);
+        router.refresh();
+      }
+    },
+    [closeMobileSidebar, router]
+  );
+
+  const verifyAdminSession = React.useCallback(async () => {
     try {
-      await authClient.signOut();
-    } finally {
-      closeMobileSidebar();
-      router.push("/login");
-      router.refresh();
+      const res = await fetch("/api/v1/auth/me", {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const isTimeout = errData?.code === "SESSION_TIMEOUT";
+        await handleSignOut(isTimeout ? "timeout" : "unauthorized");
+        return;
+      }
+
+      const payload = await res.json();
+      const user = payload?.data?.user;
+      const policy = payload?.data?.sessionPolicy;
+
+      if (!user || user.role !== "admin") {
+        await handleSignOut("unauthorized");
+        return;
+      }
+
+      setAdminName(user.name || "Admin Portal Active");
+      setAdminRoleTitle(
+        user.adminRoleTitle || "Operations & Trust Administrator"
+      );
+      lastActivityRef.current = Date.now();
+      setIdleSecondsRemaining(null);
+
+      if (policy?.expiresAt) {
+        sessionMaxExpiresRef.current = new Date(policy.expiresAt).getTime();
+      }
+    } catch {
+      // Network hiccup: keep current UI state until next check
     }
-  }, [closeMobileSidebar, router]);
+  }, [handleSignOut]);
+
+  React.useEffect(() => {
+    lastActivityRef.current = Date.now();
+    verifyAdminSession();
+
+    let lastTouchMs = Date.now();
+    function recordActivity() {
+      const now = Date.now();
+      if (now - lastTouchMs < 1500) return;
+      lastTouchMs = now;
+      lastActivityRef.current = now;
+      setIdleSecondsRemaining((prev) => (prev !== null ? null : prev));
+    }
+
+    const events = [
+      "mousemove",
+      "mousedown",
+      "keydown",
+      "scroll",
+      "touchstart",
+    ] as const;
+    for (const evt of events) {
+      window.addEventListener(evt, recordActivity, { passive: true });
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        verifyAdminSession();
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    const intervalId = window.setInterval(() => {
+      const now = Date.now();
+      const idleElapsed = now - lastActivityRef.current;
+
+      if (
+        sessionMaxExpiresRef.current &&
+        now >= sessionMaxExpiresRef.current
+      ) {
+        window.clearInterval(intervalId);
+        handleSignOut("timeout");
+        return;
+      }
+
+      if (idleElapsed >= ADMIN_IDLE_TIMEOUT_MS) {
+        window.clearInterval(intervalId);
+        handleSignOut("timeout");
+        return;
+      }
+
+      if (idleElapsed >= ADMIN_WARNING_THRESHOLD_MS) {
+        const remainingSec = Math.max(
+          0,
+          Math.ceil((ADMIN_IDLE_TIMEOUT_MS - idleElapsed) / 1000)
+        );
+        setIdleSecondsRemaining(remainingSec);
+      } else {
+        setIdleSecondsRemaining(null);
+      }
+    }, 1000);
+
+    return () => {
+      for (const evt of events) {
+        window.removeEventListener(evt, recordActivity);
+      }
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.clearInterval(intervalId);
+    };
+  }, [handleSignOut, verifyAdminSession]);
 
   return (
     <div className="no-scrollbar min-h-screen flex bg-surface-pearl text-ink-primary">
       {/* Desktop Sticky Sidebar (Premium Glossy White, No Scrollbars) */}
       <aside className="hidden lg:block lg:w-60 xl:w-64 shrink-0">
         <div className="sticky top-0 h-screen overflow-hidden">
-          <SidebarContent pathname={pathname} onSignOut={handleSignOut} />
+          <SidebarContent
+            pathname={pathname}
+            onSignOut={() => handleSignOut()}
+            adminName={adminName}
+            adminRoleTitle={adminRoleTitle}
+          />
         </div>
       </aside>
 
@@ -703,7 +845,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               <SidebarContent
                 pathname={pathname}
                 onNavigate={closeMobileSidebar}
-                onSignOut={handleSignOut}
+                onSignOut={() => handleSignOut()}
+                adminName={adminName}
+                adminRoleTitle={adminRoleTitle}
               />
             </motion.aside>
           </div>
@@ -716,8 +860,50 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           pathname={pathname}
           mobileOpen={mobileOpen}
           onToggleMobile={toggleMobileSidebar}
-          onSignOut={handleSignOut}
+          onSignOut={() => handleSignOut()}
         />
+
+        {/* Idle Timeout Countdown Warning Banner */}
+        <AnimatePresence>
+          {idleSecondsRemaining !== null && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="mx-auto mt-2.5 w-full max-w-[1600px] px-2.5 sm:px-4 lg:px-5"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-accent-gold bg-brand-950 px-4 py-2.5 text-xs font-bold text-ink-on-blue shadow-gloss-float">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-accent-gold shrink-0" />
+                  <span>
+                    Inactivity Warning: Your administrator session will expire in{" "}
+                    <strong className="font-mono text-accent-gold">
+                      {Math.floor(idleSecondsRemaining / 60)}:
+                      {String(idleSecondsRemaining % 60).padStart(2, "0")}
+                    </strong>
+                    .
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CtaButton
+                    variant="secondary"
+                    size="xs"
+                    onClick={() => verifyAdminSession()}
+                  >
+                    <span>Stay Signed In</span>
+                  </CtaButton>
+                  <CtaButton
+                    variant="primary"
+                    size="xs"
+                    onClick={() => handleSignOut()}
+                  >
+                    <span>Sign Out</span>
+                  </CtaButton>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Main Admin Content Area */}
         <main className="flex-1 w-full max-w-[1600px] mx-auto p-2.5 sm:p-4 lg:p-5">

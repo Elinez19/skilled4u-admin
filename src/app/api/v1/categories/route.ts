@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse, connection } from "next/server";
+import { asc, eq } from "drizzle-orm";
+import { requireAdmin } from "@/lib/auth-guard";
+import { protectMutationApi } from "@/lib/arcjet";
 import { db } from "@/db";
 import { categories } from "@/db/schema";
-import { asc, eq } from "drizzle-orm";
 
 export async function GET() {
-  await connection();
+  try {
+    await connection();
+  } catch {
+    // Direct invocation outside Next.js request store
+  }
   try {
     const items = await db
       .select()
@@ -22,6 +28,12 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const blocked = await protectMutationApi(req);
+    if (blocked) return blocked;
+
+    const adminGuard = await requireAdmin(req);
+    if (!adminGuard.ok) return adminGuard.response;
+
     const body = await req.json();
     const { title, description, basePrice, subServices, isPopular, isActive } =
       body;
@@ -72,6 +84,12 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    const blocked = await protectMutationApi(req);
+    if (blocked) return blocked;
+
+    const adminGuard = await requireAdmin(req);
+    if (!adminGuard.ok) return adminGuard.response;
+
     const body = await req.json();
     const {
       id,
@@ -141,6 +159,12 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const blocked = await protectMutationApi(req);
+    if (blocked) return blocked;
+
+    const adminGuard = await requireAdmin(req);
+    if (!adminGuard.ok) return adminGuard.response;
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     if (!id) {

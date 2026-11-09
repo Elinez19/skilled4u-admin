@@ -15,6 +15,7 @@ export const user = pgTable("user", {
   accountStatus: text("account_status").notNull().default("active"), // "active" | "verified" | "pending" | "suspended"
   adminRoleTitle: text("admin_role_title"),
   adminPermissions: text("admin_permissions"),
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
   banned: boolean("banned").default(false),
   banReason: text("ban_reason"),
   banExpires: timestamp("ban_expires"),

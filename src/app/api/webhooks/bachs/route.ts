@@ -1,16 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
+import { normalizeUserRole, resolveAuthSession } from "@/lib/auth-guard";
 import { verifyBachsWebhookSignature } from "@/lib/bachs";
 import { db } from "@/db";
 import { payments, bookings } from "@/db/schema";
-import { eq } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
     const signature = req.headers.get("x-bachs-signature");
-    const isSimulated = req.headers.get("x-bachs-sandbox-simulate") === "true";
+    const requestedSimulation =
+      req.headers.get("x-bachs-sandbox-simulate") === "true";
 
-    if (!isSimulated && !verifyBachsWebhookSignature(rawBody, signature)) {
+    // SECURITY FIX S8: Sandbox simulation header is only permitted when triggered by an authenticated Admin in non-production
+    let allowSimulated = false;
+    if (requestedSimulation && process.env.NODE_ENV !== "production") {
+      const authCtx = await resolveAuthSession(req);
+      if (authCtx && normalizeUserRole(authCtx.user.role) === "admin") {
+        allowSimulated = true;
+      }
+    }
+
+    if (!allowSimulated && !verifyBachsWebhookSignature(rawBody, signature)) {
       return NextResponse.json(
         { error: "Invalid Bachs.io webhook signature" },
         { status: 401 }
@@ -84,4 +95,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

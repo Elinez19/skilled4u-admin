@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { nextCookies } from "better-auth/next-js";
 import { admin, bearer, emailOTP } from "better-auth/plugins";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
@@ -43,6 +44,27 @@ export const auth = betterAuth({
       });
     },
   },
+  session: {
+    expiresIn: 60 * 60 * 24 * 30, // Base max (clamped per role in applyRoleSessionPolicy: 8h Admin, 7d Artisan, 30d Client)
+    updateAge: 60 * 5,
+  },
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ["google"],
+    },
+  },
+  ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+    ? {
+        socialProviders: {
+          google: {
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+            prompt: "select_account" as const,
+          },
+        },
+      }
+    : {}),
   user: {
     additionalFields: {
       phone: {
@@ -78,6 +100,10 @@ export const auth = betterAuth({
         type: "string",
         required: false,
       },
+      mustChangePassword: {
+        type: "boolean",
+        defaultValue: false,
+      },
     },
   },
   plugins: [
@@ -89,7 +115,7 @@ export const auth = betterAuth({
     emailOTP({
       otpLength: 6,
       expiresIn: 600,
-      sendVerificationOnSignUp: true,
+      sendVerificationOnSignUp: false,
       overrideDefaultEmailVerification: true,
       async sendVerificationOTP({ email, otp, type }) {
         await sendAuthOtpEmail({
@@ -99,11 +125,18 @@ export const auth = betterAuth({
         });
       },
     }),
+    nextCookies(),
   ],
   trustedOrigins: [
     "http://localhost:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
     "http://localhost:8081",
     "exp://127.0.0.1:8081",
+    "https://backend.skilled4u.com",
+    "https://skilled4u.com",
+    "https://www.skilled4u.com",
     "skilled4u://*",
     "skilled4u-artisan://*",
     "skilled4u-customer://*",

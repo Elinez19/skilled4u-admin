@@ -1,31 +1,72 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, or } from "drizzle-orm";
-import { resolveAuthSession } from "@/lib/auth-guard";
+import { and, eq, ne, or } from "drizzle-orm";
+import { normalizeUserRole, requireAuth } from "@/lib/auth-guard";
+import { prepareNinStorage } from "@/lib/kyc-crypto";
+import { protectMutationApi } from "@/lib/arcjet";
+import { artisanOnboardingSchema } from "@/lib/validators/auth";
 import { db } from "@/db";
 import { artisans, user as userTable } from "@/db/schema";
 import { sendWelcomeOnboardingEmail } from "@/lib/resend";
 
 /**
  * POST /api/v1/auth/onboarding/artisan
- * Multi-step Artisan Mobile App onboarding & KYC submission endpoint.
- * Supports:
- * - `step: "trade_profile"` (Step 3: Trade specialty, category, hourly rate, skills, dispatch city & GPS)
- * - `step: "kyc_submission"` (Step 4: NIN 11-digit identity + NUBAN 10-digit bank settlement account)
- * - `step: "complete_all"` (Single-call full profile + KYC submission)
+ * Multi-step Artisan Mobile App onboarding, encrypted NIN + Selfie/ID KYC submission,
+ * and KYC rejection re-submission endpoint.
+ * Strictly requires an active authenticated Artisan (or Admin) session to prevent IDOR and cross-role mutation.
  */
 export async function POST(req: NextRequest) {
   try {
-    const authCtx = await resolveAuthSession(req);
-    const body = await req.json();
+    const blocked = await protectMutationApi(req);
+    if (blocked) return blocked;
+
+    const guard = await requireAuth(req, ["artisan", "admin"]);
+    if (!guard.ok) {
+      return guard.response;
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const parsed = artisanOnboardingSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error:
+            parsed.error.issues[0]?.message ||
+            "Invalid artisan onboarding or KYC data",
+          code: "VALIDATION_ERROR",
+        },
+        { status: 400 }
+      );
+    }
+
+    const caller = guard.auth.user;
+    const isAdmin = normalizeUserRole(caller.role) === "admin";
+
+    // Only an Admin may specify another user's ID/email; artisans can only onboard their own account
+    let targetUser = caller;
+    if (isAdmin && (body.userId || body.email)) {
+      if (body.userId) {
+        const [found] = await db
+          .select()
+          .from(userTable)
+          .where(eq(userTable.id, String(body.userId)))
+          .limit(1);
+        if (found) targetUser = found;
+      } else if (body.email) {
+        const [found] = await db
+          .select()
+          .from(userTable)
+          .where(eq(userTable.email, String(body.email).trim().toLowerCase()))
+          .limit(1);
+        if (found) targetUser = found;
+      }
+    }
+
     const {
       step = "complete_all",
-      userId: bodyUserId,
-      email: bodyEmail,
       name,
       phone,
       trade,
       categoryId,
-      serviceKey,
       hourlyRateNumeric,
       about,
       skills,
@@ -38,35 +79,11 @@ export async function POST(req: NextRequest) {
       bankName,
       bankAccountNumber,
       bankAccountName,
-    } = body;
-
-    let targetUser = authCtx?.user || null;
-
-    if (!targetUser && bodyUserId) {
-      const [found] = await db
-        .select()
-        .from(userTable)
-        .where(eq(userTable.id, String(bodyUserId)))
-        .limit(1);
-      targetUser = found || null;
-    } else if (!targetUser && bodyEmail) {
-      const [found] = await db
-        .select()
-        .from(userTable)
-        .where(eq(userTable.email, String(bodyEmail).trim().toLowerCase()))
-        .limit(1);
-      targetUser = found || null;
-    }
-
-    if (!targetUser) {
-      return NextResponse.json(
-        {
-          error:
-            "Unauthorized: Please provide a valid Bearer token or user identifier",
-        },
-        { status: 401 }
-      );
-    }
+      kycSelfieUrl,
+      kycIdDocumentUrl,
+      kycIdType = "nin_slip",
+    } = parsed.data;
+    const serviceKey = body.serviceKey;
 
     // Locate existing artisan record linked by userId or email
     const [existingArtisan] = await db
@@ -82,7 +99,10 @@ export async function POST(req: NextRequest) {
 
     const resolvedName = name || targetUser.name;
     const resolvedPhone =
-      phone || targetUser.phone || existingArtisan?.phone || "+234 803 000 0000";
+      phone ||
+      targetUser.phone ||
+      existingArtisan?.phone ||
+      "+234 803 000 0000";
     const resolvedCity =
       city || targetUser.city || existingArtisan?.city || "Abuja (Wuse II)";
     const resolvedAddress =
@@ -95,17 +115,57 @@ export async function POST(req: NextRequest) {
       15000;
     const formattedRate = `₦${rateNum.toLocaleString()}`;
 
+    const isKycStep = step === "kyc_submission" || step === "complete_all";
+    const effectiveSelfieUrl =
+      kycSelfieUrl || existingArtisan?.kycSelfieUrl || null;
+    const effectiveIdDocUrl =
+      kycIdDocumentUrl || existingArtisan?.kycIdDocumentUrl || null;
+
     if (
-      (step === "kyc_submission" || step === "complete_all") &&
-      (!ninNumber || !bankName || !bankAccountNumber)
+      isKycStep &&
+      (!ninNumber ||
+        !bankName ||
+        !bankAccountNumber ||
+        !effectiveSelfieUrl ||
+        !effectiveIdDocUrl)
     ) {
       return NextResponse.json(
         {
           error:
-            "NIN verification number, settlement bank name, and NUBAN account number are required for KYC submission",
+            "11-digit NIN, settlement bank name, 10-digit NUBAN account number, live KYC selfie URL (kycSelfieUrl), and government ID document URL (kycIdDocumentUrl) are required for KYC submission.",
+          code: "MISSING_KYC_FIELDS",
         },
         { status: 400 }
       );
+    }
+
+    // Encrypt NIN with AES-256-GCM & compute HMAC-SHA256 blind index to prevent duplicate NINs across accounts
+    let ninPrepared: ReturnType<typeof prepareNinStorage> | null = null;
+    if (ninNumber) {
+      ninPrepared = prepareNinStorage(ninNumber);
+      const duplicateQuery = existingArtisan
+        ? and(
+            eq(artisans.ninHash, ninPrepared.ninHash),
+            ne(artisans.id, existingArtisan.id)
+          )
+        : eq(artisans.ninHash, ninPrepared.ninHash);
+
+      const [duplicateArtisan] = await db
+        .select({ id: artisans.id })
+        .from(artisans)
+        .where(duplicateQuery)
+        .limit(1);
+
+      if (duplicateArtisan) {
+        return NextResponse.json(
+          {
+            error:
+              "This 11-digit NIN is already registered to another Skilled4U Artisan account. Duplicate NIN registrations are not permitted.",
+            code: "DUPLICATE_NIN",
+          },
+          { status: 409 }
+        );
+      }
     }
 
     let artisanProfile = existingArtisan || null;
@@ -155,7 +215,13 @@ export async function POST(req: NextRequest) {
           longitude: typeof longitude === "number" ? longitude : 7.3986,
           isOnline: true,
           kycStatus: "pending",
-          ninNumber: ninNumber || null,
+          ninNumber: ninPrepared ? ninPrepared.ninMasked : null,
+          ninEncrypted: ninPrepared ? ninPrepared.ninEncrypted : null,
+          ninHash: ninPrepared ? ninPrepared.ninHash : null,
+          kycSelfieUrl: effectiveSelfieUrl,
+          kycIdDocumentUrl: effectiveIdDocUrl,
+          kycIdType: isKycStep ? kycIdType : null,
+          kycRejectionReason: null,
           bankName: bankName || null,
           bankAccountNumber: bankAccountNumber || null,
           bankAccountName: bankAccountName || resolvedName,
@@ -164,6 +230,14 @@ export async function POST(req: NextRequest) {
 
       artisanProfile = created;
     } else {
+      // If artisan is re-submitting KYC after a previous rejection, transition kycStatus from "rejected" -> "pending"
+      const nextKycStatus =
+        isKycStep && artisanProfile.kycStatus === "rejected"
+          ? "pending"
+          : artisanProfile.kycStatus === "verified"
+            ? "verified"
+            : "pending";
+
       const [updated] = await db
         .update(artisans)
         .set({
@@ -184,15 +258,25 @@ export async function POST(req: NextRequest) {
           address: resolvedAddress,
           ...(typeof latitude === "number" ? { latitude } : {}),
           ...(typeof longitude === "number" ? { longitude } : {}),
-          ...(ninNumber ? { ninNumber: String(ninNumber).trim() } : {}),
+          ...(ninPrepared
+            ? {
+                ninNumber: ninPrepared.ninMasked,
+                ninEncrypted: ninPrepared.ninEncrypted,
+                ninHash: ninPrepared.ninHash,
+              }
+            : {}),
+          ...(effectiveSelfieUrl ? { kycSelfieUrl: effectiveSelfieUrl } : {}),
+          ...(effectiveIdDocUrl
+            ? { kycIdDocumentUrl: effectiveIdDocUrl }
+            : {}),
+          ...(isKycStep ? { kycIdType, kycRejectionReason: null } : {}),
           ...(bankName ? { bankName: String(bankName).trim() } : {}),
           ...(bankAccountNumber
             ? { bankAccountNumber: String(bankAccountNumber).trim() }
             : {}),
           bankAccountName:
             bankAccountName || artisanProfile.bankAccountName || resolvedName,
-          kycStatus:
-            artisanProfile.kycStatus === "verified" ? "verified" : "pending",
+          kycStatus: nextKycStatus,
           updatedAt: new Date(),
         })
         .where(eq(artisans.id, artisanProfile.id))
@@ -202,16 +286,20 @@ export async function POST(req: NextRequest) {
     }
 
     const isKycSubmitted =
-      step === "kyc_submission" ||
-      step === "complete_all" ||
-      Boolean(artisanProfile.ninNumber && artisanProfile.bankAccountNumber);
+      isKycStep ||
+      Boolean(
+        (artisanProfile.ninEncrypted || artisanProfile.ninNumber) &&
+          artisanProfile.bankAccountNumber
+      );
 
     const nextOnboardingStatus =
       artisanProfile.kycStatus === "verified"
         ? "completed"
-        : isKycSubmitted
-          ? "pending_kyc"
-          : "in_progress";
+        : artisanProfile.kycStatus === "rejected"
+          ? "kyc_rejected"
+          : isKycSubmitted
+            ? "pending_kyc"
+            : "in_progress";
     const nextOnboardingStep =
       artisanProfile.kycStatus === "verified"
         ? 5
@@ -237,7 +325,7 @@ export async function POST(req: NextRequest) {
       .returning();
 
     let welcomeEmailSent = false;
-    if (isKycSubmitted) {
+    if (isKycStep || !existingArtisan) {
       const emailRes = await sendWelcomeOnboardingEmail({
         to: updatedUser.email,
         name: updatedUser.name,
@@ -248,15 +336,25 @@ export async function POST(req: NextRequest) {
       welcomeEmailSent = emailRes.success;
     }
 
+    // Never expose raw AES-256-GCM ciphertext or blind-index hash in API responses
+    const safeArtisanProfile = {
+      ...artisanProfile,
+      ninEncrypted: null,
+      ninHash: null,
+    };
+
     return NextResponse.json({
       data: {
         user: updatedUser,
-        artisanProfile,
+        artisanProfile: safeArtisanProfile,
         onboarding: {
           role: "artisan",
           status: nextOnboardingStatus,
           step: nextOnboardingStep,
           kycStatus: artisanProfile.kycStatus,
+          kycDocumentsUploaded: Boolean(
+            artisanProfile.kycSelfieUrl && artisanProfile.kycIdDocumentUrl
+          ),
           nextStep:
             nextOnboardingStatus === "completed"
               ? "ready_for_dispatch"
@@ -275,4 +373,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

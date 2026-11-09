@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { resolveAuthSession } from "@/lib/auth-guard";
+import { normalizeUserRole, requireAuth } from "@/lib/auth-guard";
+import { protectMutationApi } from "@/lib/arcjet";
+import { customerOnboardingSchema } from "@/lib/validators/auth";
 import { db } from "@/db";
 import { user as userTable } from "@/db/schema";
 import { sendWelcomeOnboardingEmail } from "@/lib/resend";
@@ -8,59 +10,73 @@ import { sendWelcomeOnboardingEmail } from "@/lib/resend";
 /**
  * POST /api/v1/auth/onboarding/customer
  * Completes Customer Mobile App onboarding (Step 3: Phone, Dispatch City & Neighborhood Address).
- * Authenticates via Mobile `Authorization: Bearer <token>` or Web Session Cookie,
- * or accepts `userId` / `email` during guided onboarding.
+ * Strictly requires an active authenticated session (Bearer Token or Session Cookie) to prevent IDOR.
  */
 export async function POST(req: NextRequest) {
   try {
-    const authCtx = await resolveAuthSession(req);
-    const body = await req.json();
-    const {
-      userId: bodyUserId,
-      email: bodyEmail,
-      name,
-      phone,
-      city,
-      address,
-    } = body;
+    const blocked = await protectMutationApi(req);
+    if (blocked) return blocked;
 
-    let targetUser = authCtx?.user || null;
-
-    if (!targetUser && bodyUserId) {
-      const [found] = await db
-        .select()
-        .from(userTable)
-        .where(eq(userTable.id, String(bodyUserId)))
-        .limit(1);
-      targetUser = found || null;
-    } else if (!targetUser && bodyEmail) {
-      const [found] = await db
-        .select()
-        .from(userTable)
-        .where(eq(userTable.email, String(bodyEmail).trim().toLowerCase()))
-        .limit(1);
-      targetUser = found || null;
+    const guard = await requireAuth(req, ["client", "admin"]);
+    if (!guard.ok) {
+      return guard.response;
     }
 
-    if (!targetUser) {
+    const body = await req.json().catch(() => ({}));
+    const caller = guard.auth.user;
+    const isAdmin = normalizeUserRole(caller.role) === "admin";
+
+    // Only an Admin may specify another user's ID/email; regular users can only onboard their own account
+    let targetUser = caller;
+    if (isAdmin && (body.userId || body.email)) {
+      if (body.userId) {
+        const [found] = await db
+          .select()
+          .from(userTable)
+          .where(eq(userTable.id, String(body.userId)))
+          .limit(1);
+        if (found) targetUser = found;
+      } else if (body.email) {
+        const [found] = await db
+          .select()
+          .from(userTable)
+          .where(eq(userTable.email, String(body.email).trim().toLowerCase()))
+          .limit(1);
+        if (found) targetUser = found;
+      }
+    }
+
+    const parsed = customerOnboardingSchema.safeParse({
+      name: body.name || targetUser.name,
+      phone: body.phone || targetUser.phone || "+234 803 000 0000",
+      city: body.city || targetUser.city || "Abuja (Wuse II)",
+      address: body.address || targetUser.address,
+    });
+
+    if (!parsed.success) {
       return NextResponse.json(
         {
           error:
-            "Unauthorized: Please provide a valid Bearer token or user identifier",
+            parsed.error.issues[0]?.message ||
+            "Valid phone number and city are required",
+          code: "VALIDATION_ERROR",
         },
-        { status: 401 }
+        { status: 400 }
       );
     }
 
-    const resolvedPhone = phone || targetUser.phone || "+234 803 000 0000";
-    const resolvedCity = city || targetUser.city || "Abuja (Wuse II)";
+    const {
+      name: resolvedName,
+      phone: resolvedPhone,
+      city: resolvedCity,
+      address,
+    } = parsed.data;
     const resolvedAddress = address || targetUser.address || resolvedCity;
-    const resolvedName = name || targetUser.name;
 
     const [updatedUser] = await db
       .update(userTable)
       .set({
-        name: resolvedName,
+        name: resolvedName || targetUser.name,
         phone: resolvedPhone,
         city: resolvedCity,
         address: resolvedAddress,
@@ -100,4 +116,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { normalizeUserRole, requireAuth } from "@/lib/auth-guard";
+import { protectMutationApi } from "@/lib/arcjet";
 import { db } from "@/db";
 import { payments } from "@/db/schema";
 import {
@@ -9,6 +11,12 @@ import {
 
 export async function POST(req: NextRequest) {
   try {
+    const blocked = await protectMutationApi(req);
+    if (blocked) return blocked;
+
+    const guard = await requireAuth(req);
+    if (!guard.ok) return guard.response;
+
     const body = await req.json();
     const {
       bookingId,
@@ -21,7 +29,12 @@ export async function POST(req: NextRequest) {
       paymentMethod = "card",
     } = body;
 
-    if (!amount || !clientEmail || !clientName || !artisanName) {
+    const isAdmin = normalizeUserRole(guard.auth.user.role) === "admin";
+    const resolvedClientName = clientName || guard.auth.user.name;
+    const resolvedClientEmail =
+      isAdmin && clientEmail ? clientEmail : guard.auth.user.email;
+
+    if (!amount || !resolvedClientEmail || !resolvedClientName || !artisanName) {
       return NextResponse.json(
         {
           error:
@@ -37,8 +50,8 @@ export async function POST(req: NextRequest) {
     const bachsResult = await initializeBachsPayment({
       amount: Number(amount),
       currency: currency as BachsCurrency,
-      customerEmail: clientEmail,
-      customerName: clientName,
+      customerEmail: resolvedClientEmail,
+      customerName: resolvedClientName,
       reference,
       callbackUrl: `${appUrl}/admin/payments`,
       paymentMethods: [paymentMethod as BachsPaymentMethod],
@@ -49,6 +62,11 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // SECURITY FIX S8: Only mark "escrowed"/"held" immediately if an Admin creates a manual escrow entry;
+    // customer checkout initializations start as "initialized" / "pending" until confirmed by webhook.
+    const initialStatus = isAdmin && body.simulateEscrowed ? "escrowed" : "initialized";
+    const initialEscrowStatus = isAdmin && body.simulateEscrowed ? "held" : "pending";
+
     const [createdPayment] = await db
       .insert(payments)
       .values({
@@ -56,8 +74,8 @@ export async function POST(req: NextRequest) {
         reference,
         bachsTransactionId: bachsResult.data.transactionId,
         bookingId: bookingId || null,
-        clientName,
-        clientEmail,
+        clientName: resolvedClientName,
+        clientEmail: resolvedClientEmail,
         artisanId: artisanId || null,
         artisanName,
         amount: Number(amount),
@@ -65,10 +83,10 @@ export async function POST(req: NextRequest) {
         artisanPayout: bachsResult.data.artisanPayout,
         currency,
         paymentMethod,
-        status: "escrowed",
-        escrowStatus: "held",
+        status: initialStatus,
+        escrowStatus: initialEscrowStatus,
         checkoutUrl: bachsResult.data.checkoutUrl,
-        paidAt: new Date(),
+        paidAt: initialStatus === "escrowed" ? new Date() : null,
       })
       .returning();
 
@@ -87,4 +105,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
+import { normalizeUserRole, requireAuth } from "@/lib/auth-guard";
+import { protectMutationApi } from "@/lib/arcjet";
 import { db } from "@/db";
 import { payments, bookings, artisans } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { initiateBachsArtisanPayout, type BachsCurrency } from "@/lib/bachs";
 
 export async function POST(req: NextRequest) {
   try {
+    const blocked = await protectMutationApi(req);
+    if (blocked) return blocked;
+
+    const guard = await requireAuth(req);
+    if (!guard.ok) return guard.response;
+
     const body = await req.json();
     const { paymentId } = body;
 
@@ -26,6 +34,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Payment record not found" },
         { status: 404 }
+      );
+    }
+
+    const caller = guard.auth.user;
+    const isAdmin = normalizeUserRole(caller.role) === "admin";
+    const isBookingCustomer =
+      caller.email.toLowerCase() === payment.clientEmail.toLowerCase();
+
+    // SECURITY FIX S3: Only an Administrator or the customer who funded the escrow may release payout
+    if (!isAdmin && !isBookingCustomer) {
+      return NextResponse.json(
+        {
+          error:
+            "Forbidden: Only an Administrator or the booking customer can authorize an escrow release.",
+          code: "FORBIDDEN",
+        },
+        { status: 403 }
+      );
+    }
+
+    if (payment.escrowStatus === "released" || payment.status === "settled") {
+      return NextResponse.json(
+        { error: "Escrow funds have already been released for this payment." },
+        { status: 409 }
       );
     }
 
@@ -91,4 +123,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

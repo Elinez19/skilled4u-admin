@@ -22,7 +22,7 @@ export default function AdminUserManagementPage() {
   return (
     <Suspense
       fallback={
-        <AdminLoadingState label="Loading customers, artisans & administrator accounts from NeonDB..." />
+        <AdminLoadingState label="Loading customers, artisans & administrator accounts..." />
       }
     >
       <UserManagementLoader />
