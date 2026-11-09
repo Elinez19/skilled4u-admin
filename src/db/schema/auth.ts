@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, integer } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -8,12 +8,22 @@ export const user = pgTable("user", {
   image: text("image"),
   phone: text("phone"),
   role: text("role").notNull().default("client"), // "admin" | "client" | "artisan"
+  onboardingStatus: text("onboarding_status").notNull().default("not_started"), // "not_started" | "in_progress" | "pending_kyc" | "completed"
+  onboardingStep: integer("onboarding_step").notNull().default(1), // 1..5
+  city: text("city").default("Abuja (Wuse II)"),
+  address: text("address"),
+  accountStatus: text("account_status").notNull().default("active"), // "active" | "verified" | "pending" | "suspended"
+  adminRoleTitle: text("admin_role_title"),
+  adminPermissions: text("admin_permissions"),
   banned: boolean("banned").default(false),
   banReason: text("ban_reason"),
   banExpires: timestamp("ban_expires"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export type UserRow = typeof user.$inferSelect;
+export type NewUserRow = typeof user.$inferInsert;
 
 export const session = pgTable("session", {
   id: text("id").primaryKey(),

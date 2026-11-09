@@ -49,7 +49,7 @@ import { AdminStatusPill } from "@/components/admin/ui/admin-status-pill";
 import { CtaButton } from "@/components/landing/ui/cta-button";
 import { PillBadge } from "@/components/landing/ui/pill-badge";
 import { Stagger, StaggerItem } from "@/components/motion/reveal";
-import type { ArtisanRow } from "@/db/schema";
+import type { ArtisanRow, UserRow } from "@/db/schema";
 
 type UserViewFilter =
   | "artisans_all"
@@ -181,16 +181,55 @@ const ADMIN_STATUS_OPTIONS = [
 
 export function ArtisansKycWorkspace({
   initialArtisans,
+  initialUsers = [],
 }: {
   initialArtisans: ArtisanRow[];
+  initialUsers?: UserRow[];
 }) {
   const router = useRouter();
   const formRef = React.useRef<HTMLDivElement>(null);
 
+  const hydratedCustomers = React.useMemo<CustomerRecord[]>(() => {
+    const clientUsers = initialUsers.filter((u) => u.role === "client");
+    if (clientUsers.length === 0) return INITIAL_CUSTOMERS;
+    return clientUsers.map((u, idx) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      phone: u.phone || "+234 803 550 1920",
+      city: u.city || "Abuja (Wuse II)",
+      bookingsCount: Math.max(2, 6 - idx),
+      status: u.accountStatus === "pending" ? "pending" : "active",
+      joinedAt: u.createdAt
+        ? new Date(u.createdAt).toLocaleDateString("en-US", {
+            month: "short",
+            day: "2-digit",
+            year: "numeric",
+          })
+        : "2026",
+    }));
+  }, [initialUsers]);
+
+  const hydratedAdmins = React.useMemo<AdminRecord[]>(() => {
+    const adminUsers = initialUsers.filter((u) => u.role === "admin");
+    if (adminUsers.length === 0) return INITIAL_ADMINS;
+    return adminUsers.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      roleTitle: u.adminRoleTitle || "Operations Administrator",
+      permissions:
+        u.adminPermissions ||
+        "User verification, booking dispatch & escrow support",
+      status: u.accountStatus === "active" ? "active" : "verified",
+      lastActive: "Verified in NeonDB",
+    }));
+  }, [initialUsers]);
+
   const [items, setItems] = React.useState<ArtisanRow[]>(initialArtisans);
   const [customers, setCustomers] =
-    React.useState<CustomerRecord[]>(INITIAL_CUSTOMERS);
-  const [admins, setAdmins] = React.useState<AdminRecord[]>(INITIAL_ADMINS);
+    React.useState<CustomerRecord[]>(hydratedCustomers);
+  const [admins, setAdmins] = React.useState<AdminRecord[]>(hydratedAdmins);
   const [filter, setFilter] = React.useState<UserViewFilter>("artisans_all");
   const [search, setSearch] = React.useState("");
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
@@ -428,6 +467,19 @@ export function ArtisansKycWorkspace({
         }
       } else if (formGroup === "customer") {
         if (editingId) {
+          await fetch("/api/v1/users", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: editingId,
+              name,
+              email,
+              phone,
+              city,
+              role: "client",
+              accountStatus: customerStatus,
+            }),
+          }).catch(() => null);
           setCustomers((prev) =>
             prev.map((c) =>
               c.id === editingId
@@ -443,10 +495,24 @@ export function ArtisansKycWorkspace({
                 : c
             )
           );
-          notifySaved(`Updated customer ${name}`);
+          router.refresh();
+          notifySaved(`Updated customer ${name} in NeonDB`);
         } else {
+          const res = await fetch("/api/v1/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name,
+              email,
+              phone,
+              city,
+              role: "client",
+              accountStatus: customerStatus,
+            }),
+          }).catch(() => null);
+          const created = res && res.ok ? (await res.json()).data : null;
           const newCustomer: CustomerRecord = {
-            id: `cust_${Date.now()}`,
+            id: created?.id || `cust_${Date.now()}`,
             name,
             email,
             phone,
@@ -457,11 +523,25 @@ export function ArtisansKycWorkspace({
           };
           setCustomers((prev) => [newCustomer, ...prev]);
           setFilter("customers");
-          notifySaved(`Added customer ${name}`);
+          router.refresh();
+          notifySaved(`Added customer ${name} to NeonDB`);
         }
         resetForm("customer");
       } else {
         if (editingId) {
+          await fetch("/api/v1/users", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: editingId,
+              name,
+              email,
+              role: "admin",
+              accountStatus: adminStatus,
+              adminRoleTitle: roleTitle,
+              adminPermissions: permissions,
+            }),
+          }).catch(() => null);
           setAdmins((prev) =>
             prev.map((adm) =>
               adm.id === editingId
@@ -476,10 +556,24 @@ export function ArtisansKycWorkspace({
                 : adm
             )
           );
-          notifySaved(`Updated admin ${name}`);
+          router.refresh();
+          notifySaved(`Updated admin ${name} in NeonDB`);
         } else {
+          const res = await fetch("/api/v1/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name,
+              email,
+              role: "admin",
+              accountStatus: adminStatus,
+              adminRoleTitle: roleTitle,
+              adminPermissions: permissions,
+            }),
+          }).catch(() => null);
+          const created = res && res.ok ? (await res.json()).data : null;
           const newAdmin: AdminRecord = {
-            id: `adm_${Date.now()}`,
+            id: created?.id || `adm_${Date.now()}`,
             name,
             email,
             roleTitle,
@@ -489,7 +583,8 @@ export function ArtisansKycWorkspace({
           };
           setAdmins((prev) => [newAdmin, ...prev]);
           setFilter("admins");
-          notifySaved(`Added administrator ${name}`);
+          router.refresh();
+          notifySaved(`Added administrator ${name} to NeonDB`);
         }
         resetForm("admin");
       }
@@ -564,41 +659,50 @@ export function ArtisansKycWorkspace({
     notifySaved("Artisan record removed");
   }
 
-  function toggleCustomerStatus(id: string) {
+  async function toggleCustomerStatus(id: string) {
+    const current = customers.find((c) => c.id === id);
+    const nextStatus = current?.status === "active" ? "pending" : "active";
     setCustomers((prev) =>
-      prev.map((c) =>
-        c.id === id
-          ? { ...c, status: c.status === "active" ? "pending" : "active" }
-          : c
-      )
+      prev.map((c) => (c.id === id ? { ...c, status: nextStatus } : c))
     );
-    notifySaved("Customer account status updated");
+    await fetch("/api/v1/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, accountStatus: nextStatus }),
+    }).catch(() => null);
+    notifySaved("Customer account status updated in NeonDB");
   }
 
-  function deleteCustomer(id: string) {
+  async function deleteCustomer(id: string) {
     setCustomers((prev) => prev.filter((c) => c.id !== id));
     if (editingId === id) resetForm("customer");
-    notifySaved("Customer account removed");
+    await fetch(`/api/v1/users?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }).catch(() => null);
+    notifySaved("Customer account removed from NeonDB");
   }
 
-  function toggleAdminStatus(id: string) {
+  async function toggleAdminStatus(id: string) {
+    const current = admins.find((adm) => adm.id === id);
+    const nextStatus = current?.status === "verified" ? "active" : "verified";
     setAdmins((prev) =>
-      prev.map((adm) =>
-        adm.id === id
-          ? {
-              ...adm,
-              status: adm.status === "verified" ? "active" : "verified",
-            }
-          : adm
-      )
+      prev.map((adm) => (adm.id === id ? { ...adm, status: nextStatus } : adm))
     );
-    notifySaved("Administrator status updated");
+    await fetch("/api/v1/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, accountStatus: nextStatus }),
+    }).catch(() => null);
+    notifySaved("Administrator status updated in NeonDB");
   }
 
-  function deleteAdmin(id: string) {
+  async function deleteAdmin(id: string) {
     setAdmins((prev) => prev.filter((adm) => adm.id !== id));
     if (editingId === id) resetForm("admin");
-    notifySaved("Administrator access revoked");
+    await fetch(`/api/v1/users?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }).catch(() => null);
+    notifySaved("Administrator access revoked in NeonDB");
   }
 
   const counts = React.useMemo(

@@ -117,10 +117,10 @@ export function OverviewDashboard({
     <div className="space-y-3 sm:space-y-4">
       {/* 1. Hero Banner Slab with hero-bg.jpg + OffsetRing Cluster + Strictly 2 CTAs */}
       <AdminHeroBanner
-        eyebrow="Marketplace Operations & Governance"
+        eyebrow="User Management"
         eyebrowIcon="dot"
-        headline="Operations & User Management Desk."
-        highlightWords={["Operations", "Management", "Desk."]}
+        headline="User Management Desk"
+        highlightWords={["User", "Management"]}
         subtitle="Manage customers, artisans, and administrators, coordinate service bookings and dispatches, oversee categories and reviews, and resolve disputes and support tickets."
         primaryCta={{
           label: "Manage Users",

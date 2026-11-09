@@ -210,7 +210,7 @@ function SidebarContent({
         {/* Navigation Section */}
         <div className="space-y-1">
           <p className="px-2.5 font-display text-[10px] font-extrabold uppercase tracking-wider text-brand-600">
-            Operations Console
+            Admin Portal
           </p>
 
           <nav aria-label="Admin Sidebar" className="space-y-1">
@@ -287,7 +287,7 @@ function SidebarContent({
             </OffsetRing>
             <div className="min-w-0">
               <p className="font-display text-[11px] font-extrabold text-brand-950 leading-tight">
-                Marketplace Active
+                Admin Portal Active
               </p>
               <p className="truncate text-[10px] font-semibold text-brand-600 leading-tight">
                 Customers · Artisans · Admins
@@ -298,7 +298,7 @@ function SidebarContent({
           <div className="flex flex-wrap items-center gap-1">
             <span className="inline-flex items-center gap-1 rounded-pill bg-surface-porcelain px-2 py-0.5 font-display text-[9px] font-extrabold text-brand-700 border border-brand-100">
               <Users className="h-2.5 w-2.5 text-brand-600" />
-              Verified Pros
+              Verified Artisans
             </span>
             <span className="inline-flex items-center gap-1 rounded-pill bg-surface-porcelain px-2 py-0.5 font-display text-[9px] font-extrabold text-brand-700 border border-brand-100">
               <Lock className="h-2.5 w-2.5 text-accent-gold" />
