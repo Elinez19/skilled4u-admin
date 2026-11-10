@@ -19,6 +19,7 @@ export interface UseUserManagementFiltersProps {
     pending: number;
     rejected: number;
   };
+  defaultTab?: UserViewFilter;
 }
 
 export interface UseUserManagementFiltersReturn {
@@ -42,8 +43,9 @@ export function useUserManagementFilters({
   customers,
   admins,
   counts,
+  defaultTab = "artisans_all",
 }: UseUserManagementFiltersProps): UseUserManagementFiltersReturn {
-  const [filter, setFilter] = useState<UserViewFilter>("artisans_all");
+  const [filter, setFilter] = useState<UserViewFilter>(defaultTab);
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 

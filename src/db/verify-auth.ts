@@ -50,6 +50,9 @@ async function ensureSchemaColumnsExist() {
     sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "must_change_password" boolean NOT NULL DEFAULT false;`
   );
   await db.execute(
+    sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "admin_scope" text;`
+  );
+  await db.execute(
     sql`ALTER TABLE "artisans" ADD COLUMN IF NOT EXISTS "nin_encrypted" text;`
   );
   await db.execute(

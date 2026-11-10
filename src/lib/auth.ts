@@ -100,6 +100,10 @@ export const auth = betterAuth({
         type: "string",
         required: false,
       },
+      adminScope: {
+        type: "string",
+        required: false,
+      },
       mustChangePassword: {
         type: "boolean",
         defaultValue: false,

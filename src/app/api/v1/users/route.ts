@@ -1,11 +1,32 @@
+import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { auth } from "@/lib/auth";
-import { normalizeUserRole, requireAdmin } from "@/lib/auth-guard";
+import {
+  assertCanManageTarget,
+  normalizeUserRole,
+  requireAdmin,
+  resolveAdminScope,
+} from "@/lib/auth-guard";
 import { protectMutationApi } from "@/lib/arcjet";
+import { recordAdminAudit } from "@/lib/audit";
 import { db } from "@/db";
-import { session as sessionTable, user as userTable } from "@/db/schema";
+import {
+  bookings,
+  session as sessionTable,
+  user as userTable,
+} from "@/db/schema";
 import { sendWelcomeOnboardingEmail } from "@/lib/resend";
+
+function generateSecureTempPassword(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  const bytes = crypto.randomBytes(6);
+  for (let i = 0; i < 6; i++) {
+    code += chars[bytes[i] % chars.length];
+  }
+  return `Sk4U!${code}`;
+}
 
 /**
  * GET /api/v1/users?role=client|admin|artisan
@@ -65,6 +86,7 @@ export async function POST(req: NextRequest) {
       accountStatus,
       adminRoleTitle,
       adminPermissions,
+      adminScope,
     } = body;
 
     if (!name || !email) {
@@ -77,7 +99,7 @@ export async function POST(req: NextRequest) {
     const normalizedEmail = String(email).trim().toLowerCase();
     const role = normalizeUserRole(rawRole);
 
-    // Granular RBAC: Only a Super Admin can create or modify Administrator accounts
+    // Granular RBAC: Only a Super Admin can create Administrator accounts
     if (role === "admin") {
       const superGuard = await requireAdmin(req, ["super_admin"]);
       if (!superGuard.ok) return superGuard.response;
@@ -86,10 +108,14 @@ export async function POST(req: NextRequest) {
     const resolvedCity = city || "Abuja (Wuse II)";
     const resolvedPhone = phone || "+234 803 550 1920";
     const resolvedPassword =
-      password || (role === "admin" ? "Admin@2026" : "Customer@2026");
+      (password && String(password).trim().length >= 6)
+        ? String(password).trim()
+        : generateSecureTempPassword();
+
     const enforceAdminPasswordReset =
       role === "admin" ? (body.mustChangePassword ?? true) : false;
 
+    // Strict 1-Email-1-Role: Reject if email already exists
     const [existing] = await db
       .select()
       .from(userTable)
@@ -97,32 +123,24 @@ export async function POST(req: NextRequest) {
       .limit(1);
 
     if (existing) {
-      const [updatedExisting] = await db
-        .update(userTable)
-        .set({
-          name: String(name).trim(),
-          phone: resolvedPhone,
-          city: resolvedCity,
-          address: address || resolvedCity,
-          role,
-          accountStatus:
-            accountStatus || (role === "admin" ? "verified" : "active"),
-          adminRoleTitle:
-            role === "admin"
-              ? adminRoleTitle || "Operations Coordinator"
-              : null,
-          adminPermissions:
-            role === "admin"
-              ? adminPermissions ||
-                "User verification, booking dispatch & escrow support"
-              : null,
-          updatedAt: new Date(),
-        })
-        .where(eq(userTable.id, existing.id))
-        .returning();
-
-      return NextResponse.json({ data: updatedExisting }, { status: 200 });
+      return NextResponse.json(
+        {
+          error: `An account with this email address already exists (${normalizeUserRole(
+            existing.role
+          )} role). Each email is strictly bound to one account.`,
+          code: "EMAIL_ALREADY_EXISTS",
+        },
+        { status: 409 }
+      );
     }
+
+    const resolvedAdminScope =
+      role === "admin"
+        ? (adminScope &&
+          ["super_admin", "kyc_moderator", "dispatch_support"].includes(adminScope)
+            ? adminScope
+            : "dispatch_support")
+        : null;
 
     const signUpRes = await auth.api.signUpEmail({
       body: {
@@ -145,12 +163,13 @@ export async function POST(req: NextRequest) {
             ? adminPermissions ||
               "User verification, booking dispatch & escrow support"
             : undefined,
+        adminScope: resolvedAdminScope || undefined,
       },
     });
 
     const userId = signUpRes.user.id;
 
-    // Delete the temporary session created by signUpEmail so the current Admin's session is unaffected
+    // Delete the temporary session created by signUpEmail so current Admin's session is unaffected
     if (signUpRes.token) {
       const baseTok = signUpRes.token.includes(".")
         ? signUpRes.token.split(".")[0]
@@ -179,6 +198,7 @@ export async function POST(req: NextRequest) {
             ? adminPermissions ||
               "User verification, booking dispatch & escrow support"
             : null,
+        adminScope: resolvedAdminScope,
         mustChangePassword: enforceAdminPasswordReset,
         updatedAt: new Date(),
       })
@@ -192,6 +212,20 @@ export async function POST(req: NextRequest) {
       city: resolvedCity,
       adminRoleTitle: adminRoleTitle || "Operations Coordinator",
       temporaryPassword: enforceAdminPasswordReset ? resolvedPassword : undefined,
+    });
+
+    await recordAdminAudit({
+      actorId: adminGuard.auth.user.id,
+      actorEmail: adminGuard.auth.user.email,
+      action: role === "admin" ? "create_admin" : "create_user",
+      targetUserId: createdUser.id,
+      targetUserEmail: createdUser.email,
+      targetRole: role,
+      details: {
+        adminScope: resolvedAdminScope,
+        adminRoleTitle,
+        mustChangePassword: enforceAdminPasswordReset,
+      },
     });
 
     return NextResponse.json({ data: createdUser }, { status: 201 });
@@ -234,6 +268,7 @@ export async function PATCH(req: NextRequest) {
       onboardingStep,
       adminRoleTitle,
       adminPermissions,
+      adminScope,
       banned,
       banReason,
     } = body;
@@ -251,17 +286,46 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    if (
-      typeof role === "string" &&
-      normalizeUserRole(role) === "admin"
-    ) {
-      const superGuard = await requireAdmin(req, ["super_admin"]);
-      if (!superGuard.ok) return superGuard.response;
+    const targetUsers = await db
+      .select()
+      .from(userTable)
+      .where(
+        targetIds.length === 1
+          ? eq(userTable.id, targetIds[0])
+          : inArray(userTable.id, targetIds)
+      );
+
+    if (targetUsers.length === 0) {
+      return NextResponse.json(
+        { error: "No matching user accounts found" },
+        { status: 404 }
+      );
     }
-    if (
+
+    // Enforce target protection and RBAC
+    for (const targetUser of targetUsers) {
+      const check = assertCanManageTarget(
+        adminGuard.auth.user,
+        targetUser,
+        "modify or suspend"
+      );
+      if (!check.ok) {
+        return NextResponse.json(
+          { error: check.error },
+          { status: check.status }
+        );
+      }
+    }
+
+    // Role elevation to admin or scope modification strictly requires super_admin
+    const isPromotingToAdmin =
+      typeof role === "string" && normalizeUserRole(role) === "admin";
+    const isModifyingAdminDetails =
       typeof adminRoleTitle === "string" ||
-      typeof adminPermissions === "string"
-    ) {
+      typeof adminPermissions === "string" ||
+      typeof adminScope === "string";
+
+    if (isPromotingToAdmin || isModifyingAdminDetails) {
       const superGuard = await requireAdmin(req, ["super_admin"]);
       if (!superGuard.ok) return superGuard.response;
     }
@@ -279,6 +343,9 @@ export async function PATCH(req: NextRequest) {
     if (typeof address === "string") updateValues.address = address.trim();
     if (typeof role === "string") {
       updateValues.role = normalizeUserRole(role);
+    }
+    if (typeof adminScope === "string") {
+      updateValues.adminScope = adminScope;
     }
     if (typeof accountStatus === "string") {
       updateValues.accountStatus = accountStatus;
@@ -307,6 +374,17 @@ export async function PATCH(req: NextRequest) {
       updateValues.banReason = banReason;
     }
 
+    // If suspending user(s), immediately revoke all their active sessions
+    if (accountStatus === "suspended" || banned === true) {
+      await db
+        .delete(sessionTable)
+        .where(
+          targetIds.length === 1
+            ? eq(sessionTable.userId, targetIds[0])
+            : inArray(sessionTable.userId, targetIds)
+        );
+    }
+
     const updatedRows = await db
       .update(userTable)
       .set(updateValues)
@@ -316,6 +394,32 @@ export async function PATCH(req: NextRequest) {
           : inArray(userTable.id, targetIds)
       )
       .returning();
+
+    for (const targetUser of targetUsers) {
+      const isSuspended = accountStatus === "suspended" || banned === true;
+      const isReactivated =
+        (accountStatus === "active" || accountStatus === "verified") &&
+        targetUser.accountStatus === "suspended";
+
+      await recordAdminAudit({
+        actorId: adminGuard.auth.user.id,
+        actorEmail: adminGuard.auth.user.email,
+        action: isSuspended
+          ? "suspend_user"
+          : isReactivated
+            ? "reactivate_user"
+            : targetUser.role === "admin"
+              ? "update_admin"
+              : "update_user",
+        targetUserId: targetUser.id,
+        targetUserEmail: targetUser.email,
+        targetRole: targetUser.role,
+        details: {
+          updatedFields: Object.keys(updateValues),
+          banReason: banReason || null,
+        },
+      });
+    }
 
     return NextResponse.json({
       data: targetIds.length === 1 ? updatedRows[0] : updatedRows,
@@ -331,15 +435,15 @@ export async function PATCH(req: NextRequest) {
 
 /**
  * DELETE /api/v1/users?id=... or ?ids=id1,id2
- * Deletes user record(s) (Admin only).
+ * Hard deletes user record(s) (Super Admin only).
  */
 export async function DELETE(req: NextRequest) {
   try {
     const blocked = await protectMutationApi(req);
     if (blocked) return blocked;
 
-    const adminGuard = await requireAdmin(req);
-    if (!adminGuard.ok) return adminGuard.response;
+    const superGuard = await requireAdmin(req, ["super_admin"]);
+    if (!superGuard.ok) return superGuard.response;
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
@@ -360,6 +464,94 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
+    const targetUsers = await db
+      .select()
+      .from(userTable)
+      .where(
+        targetIds.length === 1
+          ? eq(userTable.id, targetIds[0])
+          : inArray(userTable.id, targetIds)
+      );
+
+    if (targetUsers.length === 0) {
+      return NextResponse.json(
+        { error: "No matching user accounts found to delete" },
+        { status: 404 }
+      );
+    }
+
+    // Safety checks for every target user
+    for (const targetUser of targetUsers) {
+      const check = assertCanManageTarget(
+        superGuard.auth.user,
+        targetUser,
+        "delete"
+      );
+      if (!check.ok) {
+        return NextResponse.json(
+          { error: check.error },
+          { status: check.status }
+        );
+      }
+
+      // Check if target user is the last active super_admin
+      if (
+        normalizeUserRole(targetUser.role) === "admin" &&
+        resolveAdminScope(targetUser) === "super_admin"
+      ) {
+        const otherAdmins = await db
+          .select()
+          .from(userTable)
+          .where(
+            and(
+              eq(userTable.role, "admin"),
+              ne(userTable.id, targetUser.id),
+              ne(userTable.accountStatus, "suspended")
+            )
+          );
+        const hasOtherSuperAdmin = otherAdmins.some(
+          (u) => resolveAdminScope(u) === "super_admin"
+        );
+        if (!hasOtherSuperAdmin) {
+          return NextResponse.json(
+            {
+              error:
+                "Cannot delete the last remaining active Super Administrator account.",
+            },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
+    // Check if target users have existing bookings
+    const linkedBookings = await db
+      .select({ id: bookings.id })
+      .from(bookings)
+      .where(inArray(bookings.clientId, targetIds))
+      .limit(1);
+
+    if (linkedBookings.length > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Cannot permanently delete user account with existing booking records. Please suspend the account instead to maintain historical records.",
+          code: "ACCOUNT_HAS_BOOKINGS",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Delete active sessions first
+    await db
+      .delete(sessionTable)
+      .where(
+        targetIds.length === 1
+          ? eq(sessionTable.userId, targetIds[0])
+          : inArray(sessionTable.userId, targetIds)
+      );
+
+    // Delete users
     await db
       .delete(userTable)
       .where(
@@ -367,7 +559,23 @@ export async function DELETE(req: NextRequest) {
           ? eq(userTable.id, targetIds[0])
           : inArray(userTable.id, targetIds)
       );
-    return NextResponse.json({ success: true, deletedCount: targetIds.length });
+
+    for (const targetUser of targetUsers) {
+      await recordAdminAudit({
+        actorId: superGuard.auth.user.id,
+        actorEmail: superGuard.auth.user.email,
+        action: "delete_user",
+        targetUserId: targetUser.id,
+        targetUserEmail: targetUser.email,
+        targetRole: targetUser.role,
+        details: { deletedAt: new Date().toISOString() },
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      deletedCount: targetIds.length,
+    });
   } catch (error) {
     console.error("DELETE /api/v1/users error:", error);
     return NextResponse.json(

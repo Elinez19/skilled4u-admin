@@ -1,14 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Save, UserPlus } from "lucide-react";
+import { Save, UserPlus } from "lucide-react";
 import {
   AdminInlineForm,
+  AdminSelectField,
   AdminSelectPills,
   AdminTextField,
 } from "@/components/admin/ui/admin-form-controls";
 import { CtaButton } from "@/components/landing/ui/cta-button";
 import {
+  ADMIN_SCOPE_OPTIONS,
   ADMIN_STATUS_OPTIONS,
   ARTISAN_KYC_OPTIONS,
   CUSTOMER_STATUS_OPTIONS,
@@ -16,6 +18,7 @@ import {
 } from "./constants";
 import type {
   AdminAccountStatus,
+  AdminScopeOption,
   ArtisanKycStatus,
   ArtisanUserFormData,
   CustomerAccountStatus,
@@ -198,52 +201,56 @@ export function ArtisanUserForm({
         {/* Dynamic Fields: Customer */}
         {formData.formGroup === "customer" && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <AdminTextField
-              label="Completed Bookings Count"
-              type="number"
-              min={0}
-              value={formData.bookingsCount}
-              onChange={(e) =>
-                onUpdateField("bookingsCount", e.target.value)
-              }
-              required
-            />
             <AdminSelectPills
-              label="Customer Account Status"
+              label="Customer Account Standing"
               options={CUSTOMER_STATUS_OPTIONS}
               value={formData.customerStatus}
               onChange={(st) =>
                 onUpdateField("customerStatus", st as CustomerAccountStatus)
               }
-              columns={2}
+              columns={3}
             />
           </div>
         )}
 
         {/* Dynamic Fields: Admin Staff */}
         {formData.formGroup === "admin" && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <AdminTextField
-              label="Admin Role Designation"
-              value={formData.roleTitle}
-              onChange={(e) => onUpdateField("roleTitle", e.target.value)}
-              required
-            />
-            <AdminTextField
-              label="Assigned System Permissions"
-              value={formData.permissions}
-              onChange={(e) => onUpdateField("permissions", e.target.value)}
-              required
-            />
-            <AdminSelectPills
-              label="Administrator Status"
-              options={ADMIN_STATUS_OPTIONS}
-              value={formData.adminStatus}
-              onChange={(st) =>
-                onUpdateField("adminStatus", st as AdminAccountStatus)
-              }
-              columns={2}
-            />
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <AdminSelectField<AdminScopeOption>
+                label="System Access Level & RBAC Scope"
+                options={ADMIN_SCOPE_OPTIONS}
+                value={formData.adminScope}
+                onChange={(sc) => onUpdateField("adminScope", sc)}
+                hint="Controls cryptographic permissions for KYC, dispute decisions, and admin management."
+              />
+              <AdminTextField
+                label="Job Designation / Role Title"
+                placeholder="e.g. Senior Operations Coordinator"
+                value={formData.roleTitle}
+                onChange={(e) => onUpdateField("roleTitle", e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <AdminTextField
+                label="Assigned System Permissions Note"
+                placeholder="e.g. Identity verification, booking dispatch, and support"
+                value={formData.permissions}
+                onChange={(e) => onUpdateField("permissions", e.target.value)}
+                required
+              />
+              <AdminSelectPills
+                label="Administrator Account Standing"
+                options={ADMIN_STATUS_OPTIONS}
+                value={formData.adminStatus}
+                onChange={(st) =>
+                  onUpdateField("adminStatus", st as AdminAccountStatus)
+                }
+                columns={3}
+              />
+            </div>
           </div>
         )}
 

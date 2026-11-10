@@ -1,5 +1,3 @@
-import type { ArtisanRow, UserRow } from "@/db/schema";
-
 export type UserViewFilter =
   | "artisans_all"
   | "artisans_pending"
@@ -10,8 +8,9 @@ export type UserViewFilter =
 export type FormUserGroup = "artisan" | "customer" | "admin";
 
 export type ArtisanKycStatus = "verified" | "pending" | "rejected";
-export type CustomerAccountStatus = "active" | "pending";
-export type AdminAccountStatus = "verified" | "active";
+export type CustomerAccountStatus = "active" | "pending" | "suspended";
+export type AdminAccountStatus = "verified" | "active" | "suspended";
+export type AdminScopeOption = "super_admin" | "kyc_moderator" | "dispatch_support";
 
 export interface CustomerRecord {
   id: string;
@@ -22,6 +21,7 @@ export interface CustomerRecord {
   bookingsCount: number;
   status: CustomerAccountStatus;
   joinedAt: string;
+  banned?: boolean;
 }
 
 export interface AdminRecord {
@@ -30,8 +30,11 @@ export interface AdminRecord {
   email: string;
   roleTitle: string;
   permissions: string;
+  adminScope: AdminScopeOption;
   status: AdminAccountStatus;
+  mustChangePassword?: boolean;
   lastActive: string;
+  banned?: boolean;
 }
 
 export interface ArtisanUserFormData {
@@ -51,12 +54,11 @@ export interface ArtisanUserFormData {
   kycStatus: ArtisanKycStatus;
 
   // Customer fields
-  bookingsCount: string;
   customerStatus: CustomerAccountStatus;
 
   // Admin fields
   roleTitle: string;
   permissions: string;
+  adminScope: AdminScopeOption;
   adminStatus: AdminAccountStatus;
 }
-

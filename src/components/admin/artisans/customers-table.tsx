@@ -1,7 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle2, Clock, Pencil, Plus, Trash2, Users } from "lucide-react";
+import {
+  CheckCircle2,
+  LogOut,
+  Mail,
+  Pencil,
+  Plus,
+  ShieldAlert,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { AdminActionMenu } from "@/components/admin/ui/admin-action-menu";
 import {
   AdminCheckbox,
@@ -29,6 +38,8 @@ export interface CustomersTableProps {
   onAddNewCustomer: () => void;
   onEditCustomer: (customer: CustomerRecord) => void;
   onToggleStatus: (id: string) => void;
+  onRevokeSessions?: (id: string) => void;
+  onResetPassword?: (id: string) => void;
   onDeleteCustomer: (id: string) => void;
 }
 
@@ -42,6 +53,8 @@ export function CustomersTable({
   onAddNewCustomer,
   onEditCustomer,
   onToggleStatus,
+  onRevokeSessions,
+  onResetPassword,
   onDeleteCustomer,
 }: CustomersTableProps) {
   const allSelected =
@@ -71,7 +84,7 @@ export function CustomersTable({
           <button
             type="button"
             onClick={onClearSelection}
-            className="text-xs font-bold text-ink-secondary hover:text-brand-900 transition-colors px-1"
+            className="text-xs font-bold text-ink-secondary hover:text-brand-900 transition-colors px-1 cursor-pointer"
           >
             Clear
           </button>
@@ -103,93 +116,122 @@ export function CustomersTable({
                 />
               </AdminTableHead>
               <AdminTableHead>Customer</AdminTableHead>
-              <AdminTableHead>Location</AdminTableHead>
-              <AdminTableHead>Bookings</AdminTableHead>
-              <AdminTableHead>Status</AdminTableHead>
+              <AdminTableHead>Location Hub</AdminTableHead>
+              <AdminTableHead>Booking History</AdminTableHead>
+              <AdminTableHead>Account Standing</AdminTableHead>
               <AdminTableHead className="text-right">Actions</AdminTableHead>
             </AdminTableRow>
           </AdminTableHeader>
           <AdminTableBody>
-            {filteredCustomers.map((cust) => (
-              <AdminTableRow
-                key={cust.id}
-                isSelected={selectedIds.includes(cust.id)}
-              >
-                <AdminTableCell className="w-10">
-                  <AdminCheckbox
-                    aria-label={`Select customer ${cust.name}`}
-                    checked={selectedIds.includes(cust.id)}
-                    onChange={() => onToggleSelectOne(cust.id)}
-                  />
-                </AdminTableCell>
-                <AdminTableCell className="whitespace-nowrap">
-                  <div className="font-display text-xs sm:text-sm font-extrabold text-brand-950">
-                    {cust.name}
-                  </div>
-                  <div className="text-[11px] font-semibold text-brand-700">
-                    {cust.email} · {cust.phone}
-                  </div>
-                </AdminTableCell>
-                <AdminTableCell className="font-display text-xs font-bold text-brand-950 whitespace-nowrap">
-                  {cust.city}
-                </AdminTableCell>
-                <AdminTableCell className="whitespace-nowrap">
-                  <PillBadge
-                    tone="sky"
-                    className="px-2.5 py-0.5 text-[10px]"
-                  >
-                    {cust.bookingsCount} Bookings
-                  </PillBadge>
-                </AdminTableCell>
-                <AdminTableCell>
-                  <AdminStatusPill status={cust.status} />
-                </AdminTableCell>
-                <AdminTableCell className="text-right whitespace-nowrap">
-                  <AdminActionMenu
-                    label={`Manage ${cust.name}`}
-                    ariaLabel={`Actions for customer ${cust.name}`}
-                    items={[
-                      {
-                        id: "edit",
-                        label: "Edit Customer in Form",
-                        description: "Load into inline form above",
-                        icon: <Pencil className="h-3.5 w-3.5" />,
-                        variant: "primary",
-                        onClick: () => onEditCustomer(cust),
-                      },
-                      {
-                        id: "toggle-status",
-                        label:
-                          cust.status === "active"
-                            ? "Place Account on Hold"
-                            : "Activate Account",
-                        description: "Toggle customer dispatch access",
-                        icon:
-                          cust.status === "active" ? (
-                            <Clock className="h-3.5 w-3.5" />
+            {filteredCustomers.map((cust) => {
+              const isSuspended = cust.status === "suspended" || cust.banned;
+              return (
+                <AdminTableRow
+                  key={cust.id}
+                  isSelected={selectedIds.includes(cust.id)}
+                >
+                  <AdminTableCell className="w-10">
+                    <AdminCheckbox
+                      aria-label={`Select customer ${cust.name}`}
+                      checked={selectedIds.includes(cust.id)}
+                      onChange={() => onToggleSelectOne(cust.id)}
+                    />
+                  </AdminTableCell>
+
+                  <AdminTableCell className="whitespace-nowrap">
+                    <div className="font-display text-xs sm:text-sm font-extrabold text-brand-950">
+                      {cust.name}
+                    </div>
+                    <div className="text-[11px] font-semibold text-brand-700">
+                      {cust.email} · {cust.phone}
+                    </div>
+                  </AdminTableCell>
+
+                  <AdminTableCell className="font-display text-xs font-bold text-brand-950 whitespace-nowrap">
+                    {cust.city}
+                  </AdminTableCell>
+
+                  <AdminTableCell className="whitespace-nowrap">
+                    <PillBadge
+                      tone="sky"
+                      className="px-2.5 py-0.5 text-[10px]"
+                    >
+                      {cust.bookingsCount} Bookings
+                    </PillBadge>
+                  </AdminTableCell>
+
+                  <AdminTableCell>
+                    <AdminStatusPill status={cust.status} />
+                  </AdminTableCell>
+
+                  <AdminTableCell className="text-right whitespace-nowrap">
+                    <AdminActionMenu
+                      label={`Manage ${cust.name}`}
+                      ariaLabel={`Actions for customer ${cust.name}`}
+                      items={[
+                        {
+                          id: "edit",
+                          label: "Edit Customer in Form",
+                          description: "Load profile into inline form",
+                          icon: <Pencil className="h-3.5 w-3.5" />,
+                          variant: "primary",
+                          onClick: () => onEditCustomer(cust),
+                        },
+                        {
+                          id: "toggle-status",
+                          label: isSuspended
+                            ? "Reactivate Customer"
+                            : "Suspend Account",
+                          description: isSuspended
+                            ? "Restore booking privileges"
+                            : "Revoke sessions & block dispatch",
+                          icon: isSuspended ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-accent-success" />
                           ) : (
-                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            <ShieldAlert className="h-3.5 w-3.5 text-accent-warm" />
                           ),
-                        onClick: () => onToggleStatus(cust.id),
-                      },
-                      {
-                        id: "delete",
-                        label: "Remove Customer",
-                        description: "Delete customer record",
-                        icon: <Trash2 className="h-3.5 w-3.5" />,
-                        variant: "danger",
-                        dividerBefore: true,
-                        onClick: () => onDeleteCustomer(cust.id),
-                      },
-                    ]}
-                  />
-                </AdminTableCell>
-              </AdminTableRow>
-            ))}
+                          onClick: () => onToggleStatus(cust.id),
+                        },
+                        ...(onRevokeSessions
+                          ? [
+                              {
+                                id: "revoke-sessions",
+                                label: "Force Sign-Out",
+                                description: "Invalidate mobile & web sessions",
+                                icon: <LogOut className="h-3.5 w-3.5" />,
+                                onClick: () => onRevokeSessions(cust.id),
+                              },
+                            ]
+                          : []),
+                        ...(onResetPassword
+                          ? [
+                              {
+                                id: "reset-password",
+                                label: "Send Password Reset Link",
+                                description: "Email recovery link",
+                                icon: <Mail className="h-3.5 w-3.5" />,
+                                onClick: () => onResetPassword(cust.id),
+                              },
+                            ]
+                          : []),
+                        {
+                          id: "delete",
+                          label: "Remove Customer Record",
+                          description: "Delete user profile",
+                          icon: <Trash2 className="h-3.5 w-3.5" />,
+                          variant: "danger",
+                          dividerBefore: true,
+                          onClick: () => onDeleteCustomer(cust.id),
+                        },
+                      ]}
+                    />
+                  </AdminTableCell>
+                </AdminTableRow>
+              );
+            })}
           </AdminTableBody>
         </AdminTable>
       )}
     </AdminDataTable>
   );
 }
-

@@ -9,6 +9,7 @@ import {
 import { AdminSearchInput } from "@/components/admin/ui/admin-form-controls";
 import { AdminSegmentedTabs } from "@/components/admin/ui/admin-segmented-tabs";
 import type { ArtisanRow, UserRow } from "@/db/schema";
+import type { UserViewFilter } from "./types";
 import { useArtisansKyc } from "@/hooks/admin/use-artisans-kyc";
 import { useUserForm } from "@/hooks/admin/use-user-form";
 import { useUserManagementFilters } from "@/hooks/admin/use-user-management-filters";
@@ -21,9 +22,13 @@ import { CustomersTable } from "./customers-table";
 export function ArtisansKycWorkspace({
   initialArtisans,
   initialUsers = [],
+  initialBookingCounts = {},
+  defaultTab = "artisans_all",
 }: {
   initialArtisans: ArtisanRow[];
   initialUsers?: UserRow[];
+  initialBookingCounts?: Record<string, number>;
+  defaultTab?: UserViewFilter;
 }) {
   const {
     artisans,
@@ -43,11 +48,16 @@ export function ArtisansKycWorkspace({
     deleteCustomer,
     toggleAdminStatus,
     deleteAdmin,
+    revokeUserSessions,
+    resetUserPassword,
+    resendAdminInvite,
     saveUser,
     batchVerifyArtisans,
     batchDeleteArtisans,
+    batchDeleteCustomers,
+    batchDeleteAdmins,
     counts,
-  } = useArtisansKyc(initialArtisans, initialUsers);
+  } = useArtisansKyc(initialArtisans, initialUsers, initialBookingCounts);
 
   const {
     filter,
@@ -68,6 +78,7 @@ export function ArtisansKycWorkspace({
     customers,
     admins,
     counts,
+    defaultTab,
   });
 
   const {
@@ -184,16 +195,9 @@ export function ArtisansKycWorkspace({
               }}
               onToggleSelectOne={toggleSelectOne}
               onClearSelection={clearSelection}
-              onBatchDelete={() => {
+              onBatchDelete={async () => {
                 const ids = [...selectedIds];
-                setCustomers((prev) =>
-                  prev.filter((c) => !ids.includes(c.id))
-                );
-                fetch(
-                  `/api/v1/users?ids=${encodeURIComponent(ids.join(","))}`,
-                  { method: "DELETE" }
-                ).catch(() => null);
-                notifySaved(`Removed ${ids.length} customer record(s)`);
+                await batchDeleteCustomers(ids);
                 clearSelection();
               }}
               onAddNewCustomer={() => {
@@ -202,6 +206,8 @@ export function ArtisansKycWorkspace({
               }}
               onEditCustomer={loadCustomerIntoForm}
               onToggleStatus={toggleCustomerStatus}
+              onRevokeSessions={revokeUserSessions}
+              onResetPassword={resetUserPassword}
               onDeleteCustomer={deleteCustomer}
             />
           ) : filter === "admins" ? (
@@ -217,12 +223,9 @@ export function ArtisansKycWorkspace({
               }}
               onToggleSelectOne={toggleSelectOne}
               onClearSelection={clearSelection}
-              onBatchDelete={() => {
+              onBatchDelete={async () => {
                 const ids = [...selectedIds];
-                setAdmins((prev) =>
-                  prev.filter((a) => !ids.includes(a.id))
-                );
-                notifySaved(`Removed ${ids.length} admin account(s)`);
+                await batchDeleteAdmins(ids);
                 clearSelection();
               }}
               onAddNewAdmin={() => {
@@ -231,6 +234,9 @@ export function ArtisansKycWorkspace({
               }}
               onEditAdmin={loadAdminIntoForm}
               onToggleStatus={toggleAdminStatus}
+              onRevokeSessions={revokeUserSessions}
+              onResetPassword={resetUserPassword}
+              onResendInvite={resendAdminInvite}
               onDeleteAdmin={deleteAdmin}
             />
           ) : (

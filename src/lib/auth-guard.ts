@@ -1,10 +1,11 @@
 import crypto from "node:crypto";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 import { and, eq, ne, or } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
-  artisans,
   session as sessionTable,
   user as userTable,
   type ArtisanRow,
@@ -83,17 +84,37 @@ export function normalizeUserRole(
  * - `kyc_moderator`: Authorized to view decrypted NINs, review KYC selfies/IDs, approve/reject Artisans, & handle disputes.
  * - `dispatch_support`: Authorized to manage bookings, live dispatch, and customer helpdesk (cannot manage Admins or approve KYC).
  */
-export function resolveAdminScope(user: Pick<UserRow, "role" | "email" | "adminRoleTitle" | "adminPermissions">): AdminScope {
+export function resolveAdminScope(
+  user: Pick<UserRow, "role" | "email"> & {
+    adminRoleTitle?: string | null;
+    adminPermissions?: string | null;
+    adminScope?: string | null;
+  }
+): AdminScope {
+  // 1. Direct explicit adminScope column
+  if (
+    user.adminScope === "super_admin" ||
+    user.adminScope === "kyc_moderator" ||
+    user.adminScope === "dispatch_support"
+  ) {
+    return user.adminScope;
+  }
+
+  const email = (user.email || "").toLowerCase().trim();
+  if (
+    email === "admin@skilled4u.ng" ||
+    email === "elijahndenwa88@gmail.com"
+  ) {
+    return "super_admin";
+  }
+
   const title = (user.adminRoleTitle || "").toLowerCase();
   const perms = (user.adminPermissions || "").toLowerCase();
-  const email = (user.email || "").toLowerCase().trim();
 
   if (
     title.includes("super") ||
     perms.includes("full access") ||
-    perms.includes("super_admin") ||
-    email === "admin@skilled4u.ng" ||
-    email === "elijahndenwa88@gmail.com"
+    perms.includes("super_admin")
   ) {
     return "super_admin";
   }
@@ -116,11 +137,16 @@ export function resolveAdminScope(user: Pick<UserRow, "role" | "email" | "adminR
     return "dispatch_support";
   }
 
-  return "super_admin";
+  // Least-privilege fallback instead of super_admin
+  return "dispatch_support";
 }
 
 export function canAdminManageAdmins(
-  user: Pick<UserRow, "role" | "email" | "adminRoleTitle" | "adminPermissions">
+  user: Pick<UserRow, "role" | "email"> & {
+    adminRoleTitle?: string | null;
+    adminPermissions?: string | null;
+    adminScope?: string | null;
+  }
 ): boolean {
   return (
     normalizeUserRole(user.role) === "admin" &&
@@ -129,11 +155,50 @@ export function canAdminManageAdmins(
 }
 
 export function canAdminReviewKyc(
-  user: Pick<UserRow, "role" | "email" | "adminRoleTitle" | "adminPermissions">
+  user: Pick<UserRow, "role" | "email"> & {
+    adminRoleTitle?: string | null;
+    adminPermissions?: string | null;
+    adminScope?: string | null;
+  }
 ): boolean {
   if (normalizeUserRole(user.role) !== "admin") return false;
   const scope = resolveAdminScope(user);
   return scope === "super_admin" || scope === "kyc_moderator";
+}
+
+/**
+ * Validates whether an actor admin can perform an administrative action against a target user.
+ * Enforces:
+ * - Cannot suspend, delete, or change role/scope of oneself.
+ * - Only super_admin can modify or delete other administrator accounts.
+ */
+export function assertCanManageTarget(
+  actor: UserRow,
+  targetUser: UserRow,
+  actionDescription?: string
+): { ok: true } | { ok: false; error: string; status: number } {
+  if (actor.id === targetUser.id) {
+    return {
+      ok: false,
+      status: 400,
+      error: "You cannot modify status, suspend, or delete your own administrator account.",
+    };
+  }
+
+  const targetRole = normalizeUserRole(targetUser.role);
+  const actorScope = resolveAdminScope(actor);
+
+  if (targetRole === "admin") {
+    if (actorScope !== "super_admin") {
+      return {
+        ok: false,
+        status: 403,
+        error: `Forbidden: Only Super Administrators can ${actionDescription || "manage or modify"} Administrator accounts.`,
+      };
+    }
+  }
+
+  return { ok: true };
 }
 
 /**
@@ -713,3 +778,30 @@ export function buildOnboardingChecklist(
     currentStep: user.onboardingStep,
   };
 }
+
+/**
+ * Server Component Guard helper for Admin Web Pages.
+ * Inspects incoming request headers and ensures an authenticated administrator is active.
+ * Redirects unauthorized visitors to `/login`.
+ */
+export async function requireAdminPage(
+  allowedScopes?: AdminScope[]
+): Promise<ResolvedAuthContext> {
+  const headersList = await headers();
+  const dummyReq = new Request("http://localhost:3000", {
+    headers: headersList,
+  });
+
+  const authCtx = await resolveAuthSession(dummyReq);
+  if (!authCtx || normalizeUserRole(authCtx.user.role) !== "admin") {
+    redirect("/login");
+  }
+
+  const scope = authCtx.adminScope || resolveAdminScope(authCtx.user);
+  if (allowedScopes && allowedScopes.length > 0 && !allowedScopes.includes(scope)) {
+    redirect("/admin");
+  }
+
+  return authCtx;
+}
+

@@ -147,6 +147,16 @@ export async function POST(req: NextRequest) {
       await db.delete(sessionTable).where(eq(sessionTable.token, baseTok));
     }
 
+    const resolvedAdminScope =
+      role === "admin"
+        ? (body.adminScope ||
+            (body.adminRoleTitle?.toLowerCase().includes("dispatch")
+              ? "dispatch_support"
+              : body.adminRoleTitle?.toLowerCase().includes("kyc")
+                ? "kyc_moderator"
+                : "super_admin"))
+        : null;
+
     // Ensure role & additional fields are persisted on user table
     const [updatedUser] = await db
       .update(userTable)
@@ -168,6 +178,7 @@ export async function POST(req: NextRequest) {
             ? adminRoleTitle || "Operations Administrator"
             : null,
         adminPermissions: role === "admin" ? resolvedPermissions : null,
+        adminScope: resolvedAdminScope,
         mustChangePassword: enforceAdminPasswordReset,
         emailVerified: role === "admin",
         updatedAt: new Date(),

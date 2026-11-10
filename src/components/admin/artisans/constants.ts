@@ -1,5 +1,6 @@
 import type {
   AdminRecord,
+  AdminScopeOption,
   ArtisanUserFormData,
   CustomerRecord,
 } from "./types";
@@ -55,6 +56,7 @@ export const INITIAL_ADMINS: AdminRecord[] = [
     roleTitle: "Super Administrator",
     permissions:
       "Full access: Users, Bookings, Financials, Disputes & Settings",
+    adminScope: "super_admin",
     status: "verified",
     lastActive: "Online now",
   },
@@ -65,6 +67,7 @@ export const INITIAL_ADMINS: AdminRecord[] = [
     roleTitle: "KYC & Dispute Moderator",
     permissions:
       "Artisan identity verification, dispute claims & review moderation",
+    adminScope: "kyc_moderator",
     status: "verified",
     lastActive: "18 mins ago",
   },
@@ -75,6 +78,7 @@ export const INITIAL_ADMINS: AdminRecord[] = [
     roleTitle: "Dispatch & Support Lead",
     permissions:
       "Live booking dispatch, schedule updates & customer helpdesk",
+    adminScope: "dispatch_support",
     status: "active",
     lastActive: "1 hour ago",
   },
@@ -95,11 +99,28 @@ export const ARTISAN_KYC_OPTIONS = [
 export const CUSTOMER_STATUS_OPTIONS = [
   { id: "active", label: "Active Account" },
   { id: "pending", label: "On Hold / Pending" },
+  { id: "suspended", label: "Suspended" },
 ] as const;
 
 export const ADMIN_STATUS_OPTIONS = [
   { id: "verified", label: "Verified Admin" },
   { id: "active", label: "Active Staff" },
+  { id: "suspended", label: "Suspended / Revoked" },
+] as const;
+
+export const ADMIN_SCOPE_OPTIONS = [
+  {
+    id: "super_admin" as AdminScopeOption,
+    label: "Super Admin (Full Access: Users, Roles, KYC, Financials & Settings)",
+  },
+  {
+    id: "kyc_moderator" as AdminScopeOption,
+    label: "KYC Moderator (Artisan identity verification, NIN review & Disputes)",
+  },
+  {
+    id: "dispatch_support" as AdminScopeOption,
+    label: "Dispatch & Support Lead (Live booking dispatch, schedule & Helpdesk)",
+  },
 ] as const;
 
 export const DEFAULT_USER_FORM_DATA: ArtisanUserFormData = {
@@ -115,10 +136,9 @@ export const DEFAULT_USER_FORM_DATA: ArtisanUserFormData = {
   bankName: "Access Bank",
   bankAccountNumber: "0148291042",
   kycStatus: "verified",
-  bookingsCount: "1",
   customerStatus: "active",
-  roleTitle: "Operations Coordinator",
+  roleTitle: "Operations Administrator",
   permissions: "User verification, booking dispatch & escrow support",
+  adminScope: "dispatch_support",
   adminStatus: "verified",
 };
-

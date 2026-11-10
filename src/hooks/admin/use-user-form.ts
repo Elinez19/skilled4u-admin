@@ -103,7 +103,6 @@ export function useUserForm(): UseUserFormReturn {
         email: c.email,
         phone: c.phone,
         city: c.city,
-        bookingsCount: String(c.bookingsCount),
         customerStatus: c.status as CustomerAccountStatus,
       });
       scrollToForm();
@@ -121,6 +120,7 @@ export function useUserForm(): UseUserFormReturn {
         email: adm.email,
         roleTitle: adm.roleTitle,
         permissions: adm.permissions,
+        adminScope: adm.adminScope || "dispatch_support",
         adminStatus: adm.status,
       });
       scrollToForm();

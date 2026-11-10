@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export type AuthStep = "credentials" | "mfa" | "change_password";
@@ -50,27 +50,26 @@ export function useAdminAuth(): UseAdminAuthReturn {
   const [resendingOtp, setResendingOtp] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [timeoutNotice, setTimeoutNotice] = useState<string | null>(null);
-  const [callbackUrl, setCallbackUrl] = useState("/admin");
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const reason = params.get("reason");
-    const cb = params.get("callbackUrl");
-    if (cb && cb.startsWith("/admin") && !cb.startsWith("//")) {
-      setCallbackUrl(cb);
+  const [timeoutNotice, setTimeoutNotice] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      const reason = new URLSearchParams(window.location.search).get("reason");
+      if (reason === "timeout") {
+        return "Your session expired due to inactivity. Please sign in again to continue.";
+      } else if (reason === "unauthorized") {
+        return "Please sign in with an Administrator account to access the console.";
+      }
     }
-    if (reason === "timeout") {
-      setTimeoutNotice(
-        "Your session expired due to inactivity. Please sign in again to continue."
-      );
-    } else if (reason === "unauthorized") {
-      setTimeoutNotice(
-        "Please sign in with an Administrator account to access the console."
-      );
+    return null;
+  });
+  const [callbackUrl] = useState(() => {
+    if (typeof window !== "undefined") {
+      const cb = new URLSearchParams(window.location.search).get("callbackUrl");
+      if (cb && cb.startsWith("/admin") && !cb.startsWith("//")) {
+        return cb;
+      }
     }
-  }, []);
+    return "/admin";
+  });
 
   const handleCredentialsSubmit = useCallback(
     async (e: React.FormEvent) => {

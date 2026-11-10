@@ -8,8 +8,11 @@ import {
   INITIAL_CUSTOMERS,
 } from "@/components/admin/artisans/constants";
 import type {
+  AdminAccountStatus,
   AdminRecord,
+  AdminScopeOption,
   ArtisanUserFormData,
+  CustomerAccountStatus,
   CustomerRecord,
 } from "@/components/admin/artisans/types";
 
@@ -31,9 +34,14 @@ export interface UseArtisansKycReturn {
   deleteCustomer: (id: string, onDeleted?: () => void) => Promise<void>;
   toggleAdminStatus: (id: string) => Promise<void>;
   deleteAdmin: (id: string, onDeleted?: () => void) => Promise<void>;
+  revokeUserSessions: (userId: string) => Promise<boolean>;
+  resetUserPassword: (userId: string) => Promise<boolean>;
+  resendAdminInvite: (adminId: string) => Promise<boolean>;
   saveUser: (formData: ArtisanUserFormData) => Promise<boolean>;
   batchVerifyArtisans: (selectedIds: string[]) => void;
   batchDeleteArtisans: (selectedIds: string[]) => void;
+  batchDeleteCustomers: (selectedIds: string[]) => Promise<void>;
+  batchDeleteAdmins: (selectedIds: string[]) => Promise<void>;
   counts: {
     all: number;
     verified: number;
@@ -44,45 +52,92 @@ export interface UseArtisansKycReturn {
 
 export function useArtisansKyc(
   initialArtisans: ArtisanRow[],
-  initialUsers: UserRow[] = []
+  initialUsers: UserRow[] = [],
+  initialBookingCounts: Record<string, number> = {}
 ): UseArtisansKycReturn {
   const router = useRouter();
 
   const hydratedCustomers = useMemo<CustomerRecord[]>(() => {
     const clientUsers = initialUsers.filter((u) => u.role === "client");
-    if (clientUsers.length === 0) return INITIAL_CUSTOMERS;
-    return clientUsers.map((u, idx) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      phone: u.phone || "+234 803 550 1920",
-      city: u.city || "Abuja (Wuse II)",
-      bookingsCount: Math.max(2, 6 - idx),
-      status: u.accountStatus === "pending" ? "pending" : "active",
-      joinedAt: u.createdAt
-        ? new Date(u.createdAt).toLocaleDateString("en-US", {
-            month: "short",
-            day: "2-digit",
-            year: "numeric",
-          })
-        : "2026",
-    }));
-  }, [initialUsers]);
+    if (clientUsers.length === 0 && initialUsers.length === 0) {
+      return INITIAL_CUSTOMERS;
+    }
+    return clientUsers.map((u) => {
+      const isSuspended = u.accountStatus === "suspended" || Boolean(u.banned);
+      const resolvedStatus: CustomerAccountStatus = isSuspended
+        ? "suspended"
+        : u.accountStatus === "pending"
+          ? "pending"
+          : "active";
+
+      const count =
+        initialBookingCounts[u.id] ||
+        initialBookingCounts[u.email?.toLowerCase()] ||
+        0;
+
+      return {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        phone: u.phone || "+234 803 550 1920",
+        city: u.city || "Abuja (Wuse II)",
+        bookingsCount: count,
+        status: resolvedStatus,
+        joinedAt: u.createdAt
+          ? new Date(u.createdAt).toLocaleDateString("en-US", {
+              month: "short",
+              day: "2-digit",
+              year: "numeric",
+            })
+          : "2026",
+        banned: Boolean(u.banned),
+      };
+    });
+  }, [initialUsers, initialBookingCounts]);
 
   const hydratedAdmins = useMemo<AdminRecord[]>(() => {
     const adminUsers = initialUsers.filter((u) => u.role === "admin");
-    if (adminUsers.length === 0) return INITIAL_ADMINS;
-    return adminUsers.map((u) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      roleTitle: u.adminRoleTitle || "Operations Administrator",
-      permissions:
-        u.adminPermissions ||
-        "User verification, booking dispatch & escrow support",
-      status: u.accountStatus === "active" ? "active" : "verified",
-      lastActive: "Verified Account",
-    }));
+    if (adminUsers.length === 0 && initialUsers.length === 0) {
+      return INITIAL_ADMINS;
+    }
+    return adminUsers.map((u) => {
+      const isSuspended = u.accountStatus === "suspended" || Boolean(u.banned);
+      const resolvedStatus: AdminAccountStatus = isSuspended
+        ? "suspended"
+        : u.accountStatus === "active"
+          ? "active"
+          : "verified";
+
+      const scope: AdminScopeOption =
+        (u.adminScope as AdminScopeOption) ||
+        ((u.adminRoleTitle || "").toLowerCase().includes("kyc")
+          ? "kyc_moderator"
+          : (u.adminRoleTitle || "").toLowerCase().includes("dispatch")
+            ? "dispatch_support"
+            : "super_admin");
+
+      let lastActive = "Verified Account";
+      if (isSuspended) {
+        lastActive = "Account Suspended";
+      } else if (u.mustChangePassword) {
+        lastActive = "Pending First Login";
+      }
+
+      return {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        roleTitle: u.adminRoleTitle || "Operations Administrator",
+        permissions:
+          u.adminPermissions ||
+          "User verification, booking dispatch & escrow support",
+        adminScope: scope,
+        status: resolvedStatus,
+        mustChangePassword: Boolean(u.mustChangePassword),
+        lastActive,
+        banned: Boolean(u.banned),
+      };
+    });
   }, [initialUsers]);
 
   const [artisans, setArtisans] = useState<ArtisanRow[]>(initialArtisans);
@@ -94,7 +149,7 @@ export function useArtisansKyc(
 
   const notifySaved = useCallback((msg: string) => {
     setSavedBanner(msg);
-    setTimeout(() => setSavedBanner(null), 3500);
+    setTimeout(() => setSavedBanner(null), 4500);
   }, []);
 
   const counts = useMemo(
@@ -119,15 +174,12 @@ export function useArtisansKyc(
         if (res.ok) {
           const { data } = await res.json();
           setArtisans((prev) => prev.map((a) => (a.id === id ? data : a)));
+          notifySaved(`KYC status set to ${nextKycStatus}`);
           router.refresh();
         } else {
-          setArtisans((prev) =>
-            prev.map((a) =>
-              a.id === id ? { ...a, kycStatus: nextKycStatus } : a
-            )
-          );
+          const err = await res.json().catch(() => ({}));
+          notifySaved(err.error || `Failed to set KYC status to ${nextKycStatus}`);
         }
-        notifySaved(`KYC status set to ${nextKycStatus}`);
       } finally {
         setBusyId(null);
       }
@@ -148,16 +200,11 @@ export function useArtisansKyc(
         if (res.ok) {
           const { data } = await res.json();
           setArtisans((prev) => prev.map((a) => (a.id === art.id ? data : a)));
+          notifySaved(`${art.name} marked ${nextOnline ? "Online" : "Offline"}`);
         } else {
-          setArtisans((prev) =>
-            prev.map((a) =>
-              a.id === art.id ? { ...a, isOnline: nextOnline } : a
-            )
-          );
+          const err = await res.json().catch(() => ({}));
+          notifySaved(err.error || "Failed to update online availability");
         }
-        notifySaved(
-          `${art.name} marked ${!art.isOnline ? "Online" : "Offline"}`
-        );
       } finally {
         setBusyId(null);
       }
@@ -167,17 +214,23 @@ export function useArtisansKyc(
 
   const deleteArtisan = useCallback(
     async (id: string, onDeleted?: () => void) => {
-      setArtisans((prev) => prev.filter((a) => a.id !== id));
-      onDeleted?.();
+      setBusyId(id);
       try {
-        await fetch(`/api/v1/artisans?id=${encodeURIComponent(id)}`, {
+        const res = await fetch(`/api/v1/artisans?id=${encodeURIComponent(id)}`, {
           method: "DELETE",
         });
-        router.refresh();
-      } catch {
-        // Optimistically removed
+        if (res.ok) {
+          setArtisans((prev) => prev.filter((a) => a.id !== id));
+          onDeleted?.();
+          notifySaved("Artisan record permanently removed");
+          router.refresh();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          notifySaved(err.error || "Failed to delete artisan record");
+        }
+      } finally {
+        setBusyId(null);
       }
-      notifySaved("Artisan record removed");
     },
     [notifySaved, router]
   );
@@ -185,61 +238,266 @@ export function useArtisansKyc(
   const toggleCustomerStatus = useCallback(
     async (id: string) => {
       const current = customers.find((c) => c.id === id);
-      const nextStatus = current?.status === "active" ? "pending" : "active";
-      setCustomers((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, status: nextStatus } : c))
-      );
-      await fetch("/api/v1/users", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, accountStatus: nextStatus }),
-      }).catch(() => null);
-      notifySaved("Customer account status updated");
+      if (!current) return;
+
+      const isCurrentlySuspended = current.status === "suspended";
+      const nextStatus: CustomerAccountStatus = isCurrentlySuspended
+        ? "active"
+        : "suspended";
+
+      setBusyId(id);
+      try {
+        const res = await fetch("/api/v1/users", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id,
+            accountStatus: nextStatus,
+            banned: nextStatus === "suspended",
+            banReason:
+              nextStatus === "suspended"
+                ? "Account suspended by Administrator"
+                : null,
+          }),
+        });
+
+        if (res.ok) {
+          setCustomers((prev) =>
+            prev.map((c) => (c.id === id ? { ...c, status: nextStatus } : c))
+          );
+          notifySaved(
+            `Customer account ${nextStatus === "suspended" ? "suspended and logged out" : "reactivated"}`
+          );
+          router.refresh();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          notifySaved(err.error || "Failed to update customer account status");
+        }
+      } finally {
+        setBusyId(null);
+      }
     },
-    [customers, notifySaved]
+    [customers, notifySaved, router]
   );
 
   const deleteCustomer = useCallback(
     async (id: string, onDeleted?: () => void) => {
-      setCustomers((prev) => prev.filter((c) => c.id !== id));
-      onDeleted?.();
-      await fetch(`/api/v1/users?id=${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      }).catch(() => null);
-      notifySaved("Customer account removed");
+      setBusyId(id);
+      try {
+        const res = await fetch(`/api/v1/users?id=${encodeURIComponent(id)}`, {
+          method: "DELETE",
+        });
+        if (res.ok) {
+          setCustomers((prev) => prev.filter((c) => c.id !== id));
+          onDeleted?.();
+          notifySaved("Customer record deleted");
+          router.refresh();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          notifySaved(err.error || "Failed to delete customer record");
+        }
+      } finally {
+        setBusyId(null);
+      }
     },
-    [notifySaved]
+    [notifySaved, router]
   );
 
   const toggleAdminStatus = useCallback(
     async (id: string) => {
       const current = admins.find((adm) => adm.id === id);
-      const nextStatus = current?.status === "verified" ? "active" : "verified";
-      setAdmins((prev) =>
-        prev.map((adm) =>
-          adm.id === id ? { ...adm, status: nextStatus } : adm
-        )
-      );
-      await fetch("/api/v1/users", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, accountStatus: nextStatus }),
-      }).catch(() => null);
-      notifySaved("Administrator status updated");
+      if (!current) return;
+
+      const isCurrentlySuspended = current.status === "suspended";
+      const nextStatus: AdminAccountStatus = isCurrentlySuspended
+        ? "verified"
+        : "suspended";
+
+      setBusyId(id);
+      try {
+        const res = await fetch("/api/v1/users", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id,
+            accountStatus: nextStatus,
+            banned: nextStatus === "suspended",
+            banReason:
+              nextStatus === "suspended"
+                ? "Administrator clearance revoked by Super Admin"
+                : null,
+          }),
+        });
+
+        if (res.ok) {
+          setAdmins((prev) =>
+            prev.map((adm) =>
+              adm.id === id
+                ? {
+                    ...adm,
+                    status: nextStatus,
+                    lastActive:
+                      nextStatus === "suspended"
+                        ? "Account Suspended"
+                        : "Active Staff",
+                  }
+                : adm
+            )
+          );
+          notifySaved(
+            `Administrator ${nextStatus === "suspended" ? "suspended and sessions revoked" : "clearance restored"}`
+          );
+          router.refresh();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          notifySaved(err.error || "Failed to update administrator status");
+        }
+      } finally {
+        setBusyId(null);
+      }
     },
-    [admins, notifySaved]
+    [admins, notifySaved, router]
   );
 
   const deleteAdmin = useCallback(
     async (id: string, onDeleted?: () => void) => {
-      setAdmins((prev) => prev.filter((adm) => adm.id !== id));
-      onDeleted?.();
-      await fetch(`/api/v1/users?id=${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      }).catch(() => null);
-      notifySaved("Administrator access revoked");
+      setBusyId(id);
+      try {
+        const res = await fetch(`/api/v1/users?id=${encodeURIComponent(id)}`, {
+          method: "DELETE",
+        });
+        if (res.ok) {
+          setAdmins((prev) => prev.filter((adm) => adm.id !== id));
+          onDeleted?.();
+          notifySaved("Administrator access revoked and record deleted");
+          router.refresh();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          notifySaved(err.error || "Failed to delete administrator account");
+        }
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [notifySaved, router]
+  );
+
+  const revokeUserSessions = useCallback(
+    async (userId: string): Promise<boolean> => {
+      setBusyId(userId);
+      try {
+        const res = await fetch(`/api/v1/users/${userId}/revoke-sessions`, {
+          method: "POST",
+        });
+        if (res.ok) {
+          const body = await res.json();
+          notifySaved(body.message || "All active sessions revoked");
+          return true;
+        } else {
+          const err = await res.json().catch(() => ({}));
+          notifySaved(err.error || "Failed to revoke user sessions");
+          return false;
+        }
+      } finally {
+        setBusyId(null);
+      }
     },
     [notifySaved]
+  );
+
+  const resetUserPassword = useCallback(
+    async (userId: string): Promise<boolean> => {
+      setBusyId(userId);
+      try {
+        const res = await fetch(`/api/v1/users/${userId}/reset-password`, {
+          method: "POST",
+        });
+        if (res.ok) {
+          const body = await res.json();
+          notifySaved(body.message || "Password reset email sent");
+          return true;
+        } else {
+          const err = await res.json().catch(() => ({}));
+          notifySaved(err.error || "Failed to send password reset");
+          return false;
+        }
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [notifySaved]
+  );
+
+  const resendAdminInvite = useCallback(
+    async (adminId: string): Promise<boolean> => {
+      setBusyId(adminId);
+      try {
+        const res = await fetch(`/api/v1/users/${adminId}/resend-invite`, {
+          method: "POST",
+        });
+        if (res.ok) {
+          const body = await res.json();
+          notifySaved(body.message || "New credentials sent");
+          router.refresh();
+          return true;
+        } else {
+          const err = await res.json().catch(() => ({}));
+          notifySaved(err.error || "Failed to resend credentials");
+          return false;
+        }
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [notifySaved, router]
+  );
+
+  const batchDeleteCustomers = useCallback(
+    async (selectedIds: string[]) => {
+      try {
+        const res = await fetch(
+          `/api/v1/users?ids=${encodeURIComponent(selectedIds.join(","))}`,
+          { method: "DELETE" }
+        );
+        if (res.ok) {
+          setCustomers((prev) =>
+            prev.filter((c) => !selectedIds.includes(c.id))
+          );
+          notifySaved(`Removed ${selectedIds.length} customer record(s)`);
+          router.refresh();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          notifySaved(err.error || "Failed to batch remove customer records");
+        }
+      } catch {
+        notifySaved("Network error during batch customer removal");
+      }
+    },
+    [notifySaved, router]
+  );
+
+  const batchDeleteAdmins = useCallback(
+    async (selectedIds: string[]) => {
+      try {
+        const res = await fetch(
+          `/api/v1/users?ids=${encodeURIComponent(selectedIds.join(","))}`,
+          { method: "DELETE" }
+        );
+        if (res.ok) {
+          setAdmins((prev) =>
+            prev.filter((a) => !selectedIds.includes(a.id))
+          );
+          notifySaved(`Removed ${selectedIds.length} administrator account(s)`);
+          router.refresh();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          notifySaved(err.error || "Failed to batch remove administrator accounts");
+        }
+      } catch {
+        notifySaved("Network error during batch administrator removal");
+      }
+    },
+    [notifySaved, router]
   );
 
   const saveUser = useCallback(
@@ -274,31 +532,14 @@ export function useArtisansKyc(
               setArtisans((prev) =>
                 prev.map((a) => (a.id === formData.editingId ? data : a))
               );
+              notifySaved(`Updated artisan ${formData.name}`);
               router.refresh();
+              return true;
             } else {
-              setArtisans((prev) =>
-                prev.map((a) =>
-                  a.id === formData.editingId
-                    ? {
-                        ...a,
-                        name: formData.name,
-                        email: formData.email,
-                        phone: formData.phone,
-                        trade: formData.trade,
-                        city: formData.city,
-                        hourlyRate: formattedRate,
-                        hourlyRateNumeric: rateNum,
-                        ninNumber: formData.ninNumber,
-                        bankName: formData.bankName,
-                        bankAccountNumber: formData.bankAccountNumber,
-                        kycStatus: formData.kycStatus,
-                      }
-                    : a
-                )
-              );
+              const err = await res.json().catch(() => ({}));
+              notifySaved(err.error || `Failed to update artisan ${formData.name}`);
+              return false;
             }
-            notifySaved(`Updated artisan ${formData.name}`);
-            return true;
           } else {
             const res = await fetch("/api/v1/artisans", {
               method: "POST",
@@ -320,54 +561,18 @@ export function useArtisansKyc(
             if (res.ok) {
               const { data } = await res.json();
               setArtisans((prev) => [data, ...prev]);
+              notifySaved(`Added artisan pro ${formData.name}`);
               router.refresh();
+              return true;
             } else {
-              const fallbackArtisan: ArtisanRow = {
-                id: `art_${Date.now()}`,
-                userId: null,
-                name: formData.name,
-                email: formData.email || "pro@skilled4u.ng",
-                phone: formData.phone,
-                trade: formData.trade,
-                categoryId: null,
-                serviceKey: "general",
-                profileImage: "/images/landing/hero-artisan.png",
-                hourlyRate: formattedRate,
-                hourlyRateNumeric: rateNum,
-                about: `Verified ${formData.trade} pro serving ${formData.city}.`,
-                skills: [formData.trade],
-                portfolioImages: [],
-                rating: 5.0,
-                reviewsCount: 1,
-                completedJobs: 1,
-                distance: "2.0 km",
-                city: formData.city,
-                address: formData.city,
-                latitude: 9.0765,
-                longitude: 7.3986,
-                isOnline: true,
-                kycStatus: formData.kycStatus,
-                ninNumber: formData.ninNumber,
-                ninEncrypted: null,
-                ninHash: null,
-                kycSelfieUrl: null,
-                kycIdDocumentUrl: null,
-                kycIdType: "nin_slip",
-                kycRejectionReason: null,
-                bankName: formData.bankName,
-                bankAccountNumber: formData.bankAccountNumber,
-                bankAccountName: formData.name,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-              };
-              setArtisans((prev) => [fallbackArtisan, ...prev]);
+              const err = await res.json().catch(() => ({}));
+              notifySaved(err.error || `Failed to create artisan pro ${formData.name}`);
+              return false;
             }
-            notifySaved(`Added artisan ${formData.name}`);
-            return true;
           }
         } else if (formData.formGroup === "customer") {
           if (formData.editingId) {
-            await fetch("/api/v1/users", {
+            const res = await fetch("/api/v1/users", {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -379,25 +584,31 @@ export function useArtisansKyc(
                 role: "client",
                 accountStatus: formData.customerStatus,
               }),
-            }).catch(() => null);
-            setCustomers((prev) =>
-              prev.map((c) =>
-                c.id === formData.editingId
-                  ? {
-                      ...c,
-                      name: formData.name,
-                      email: formData.email,
-                      phone: formData.phone,
-                      city: formData.city,
-                      bookingsCount: Number(formData.bookingsCount) || 0,
-                      status: formData.customerStatus,
-                    }
-                  : c
-              )
-            );
-            router.refresh();
-            notifySaved(`Updated customer ${formData.name}`);
-            return true;
+            });
+
+            if (res.ok) {
+              setCustomers((prev) =>
+                prev.map((c) =>
+                  c.id === formData.editingId
+                    ? {
+                        ...c,
+                        name: formData.name,
+                        email: formData.email,
+                        phone: formData.phone,
+                        city: formData.city,
+                        status: formData.customerStatus,
+                      }
+                    : c
+                )
+              );
+              notifySaved(`Updated customer ${formData.name}`);
+              router.refresh();
+              return true;
+            } else {
+              const err = await res.json().catch(() => ({}));
+              notifySaved(err.error || `Failed to update customer ${formData.name}`);
+              return false;
+            }
           } else {
             const res = await fetch("/api/v1/users", {
               method: "POST",
@@ -410,26 +621,34 @@ export function useArtisansKyc(
                 role: "client",
                 accountStatus: formData.customerStatus,
               }),
-            }).catch(() => null);
-            const created = res && res.ok ? (await res.json()).data : null;
-            const newCustomer: CustomerRecord = {
-              id: created?.id || `cust_${Date.now()}`,
-              name: formData.name,
-              email: formData.email,
-              phone: formData.phone,
-              city: formData.city,
-              bookingsCount: Number(formData.bookingsCount) || 0,
-              status: formData.customerStatus,
-              joinedAt: "Just now",
-            };
-            setCustomers((prev) => [newCustomer, ...prev]);
-            router.refresh();
-            notifySaved(`Added customer ${formData.name}`);
-            return true;
+            });
+
+            if (res.ok) {
+              const created = (await res.json()).data;
+              const newCustomer: CustomerRecord = {
+                id: created.id,
+                name: created.name,
+                email: created.email,
+                phone: created.phone || formData.phone,
+                city: created.city || formData.city,
+                bookingsCount: 0,
+                status: formData.customerStatus,
+                joinedAt: "Just now",
+              };
+              setCustomers((prev) => [newCustomer, ...prev]);
+              notifySaved(`Registered customer account for ${formData.name}`);
+              router.refresh();
+              return true;
+            } else {
+              const err = await res.json().catch(() => ({}));
+              notifySaved(err.error || `Failed to register customer ${formData.name}`);
+              return false;
+            }
           }
         } else {
+          // Admin Staff
           if (formData.editingId) {
-            await fetch("/api/v1/users", {
+            const res = await fetch("/api/v1/users", {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -437,28 +656,37 @@ export function useArtisansKyc(
                 name: formData.name,
                 email: formData.email,
                 role: "admin",
+                adminScope: formData.adminScope,
                 accountStatus: formData.adminStatus,
                 adminRoleTitle: formData.roleTitle,
                 adminPermissions: formData.permissions,
               }),
-            }).catch(() => null);
-            setAdmins((prev) =>
-              prev.map((adm) =>
-                adm.id === formData.editingId
-                  ? {
-                      ...adm,
-                      name: formData.name,
-                      email: formData.email,
-                      roleTitle: formData.roleTitle,
-                      permissions: formData.permissions,
-                      status: formData.adminStatus,
-                    }
-                  : adm
-              )
-            );
-            router.refresh();
-            notifySaved(`Updated admin ${formData.name}`);
-            return true;
+            });
+
+            if (res.ok) {
+              setAdmins((prev) =>
+                prev.map((adm) =>
+                  adm.id === formData.editingId
+                    ? {
+                        ...adm,
+                        name: formData.name,
+                        email: formData.email,
+                        roleTitle: formData.roleTitle,
+                        permissions: formData.permissions,
+                        adminScope: formData.adminScope,
+                        status: formData.adminStatus,
+                      }
+                    : adm
+                )
+              );
+              notifySaved(`Updated administrator ${formData.name}`);
+              router.refresh();
+              return true;
+            } else {
+              const err = await res.json().catch(() => ({}));
+              notifySaved(err.error || `Failed to update administrator ${formData.name}`);
+              return false;
+            }
           } else {
             const res = await fetch("/api/v1/users", {
               method: "POST",
@@ -467,28 +695,43 @@ export function useArtisansKyc(
                 name: formData.name,
                 email: formData.email,
                 role: "admin",
+                adminScope: formData.adminScope,
                 accountStatus: formData.adminStatus,
                 adminRoleTitle: formData.roleTitle,
                 adminPermissions: formData.permissions,
               }),
-            }).catch(() => null);
-            const created = res && res.ok ? (await res.json()).data : null;
-            const newAdmin: AdminRecord = {
-              id: created?.id || `adm_${Date.now()}`,
-              name: formData.name,
-              email: formData.email,
-              roleTitle: formData.roleTitle,
-              permissions: formData.permissions,
-              status: formData.adminStatus,
-              lastActive: "Online now",
-            };
-            setAdmins((prev) => [newAdmin, ...prev]);
-            router.refresh();
-            notifySaved(`Added administrator ${formData.name}`);
-            return true;
+            });
+
+            if (res.ok) {
+              const created = (await res.json()).data;
+              const newAdmin: AdminRecord = {
+                id: created.id,
+                name: created.name,
+                email: created.email,
+                roleTitle: created.adminRoleTitle || formData.roleTitle,
+                permissions: created.adminPermissions || formData.permissions,
+                adminScope: formData.adminScope,
+                status: formData.adminStatus,
+                mustChangePassword: true,
+                lastActive: "Pending First Login",
+              };
+              setAdmins((prev) => [newAdmin, ...prev]);
+              notifySaved(
+                `Provisioned administrator ${formData.name}. Welcome email sent.`
+              );
+              router.refresh();
+              return true;
+            } else {
+              const err = await res.json().catch(() => ({}));
+              notifySaved(err.error || `Failed to add administrator ${formData.name}`);
+              return false;
+            }
           }
         }
-      } catch {
+      } catch (err) {
+        notifySaved(
+          err instanceof Error ? err.message : "Network error while saving user"
+        );
         return false;
       } finally {
         setSaving(false);
@@ -536,10 +779,14 @@ export function useArtisansKyc(
     deleteCustomer,
     toggleAdminStatus,
     deleteAdmin,
+    revokeUserSessions,
+    resetUserPassword,
+    resendAdminInvite,
     saveUser,
     batchVerifyArtisans,
     batchDeleteArtisans,
+    batchDeleteCustomers,
+    batchDeleteAdmins,
     counts,
   };
 }
-
