@@ -11,6 +11,7 @@ import {
 } from "@/components/landing/composites/mobile-navigation-menu";
 import { CtaButton } from "@/components/landing/ui/cta-button";
 import { landingContent } from "@/content/landing";
+import { useLandingNav } from "@/hooks/landing/use-landing-nav";
 
 export { LandingFooter } from "@/components/landing/composites/landing-footer";
 export {
@@ -113,47 +114,8 @@ function DesktopNavigationCtas({
 export function LandingNavbar() {
   const { navbar } = landingContent;
   const pathname = usePathname();
-  const currentPath = pathname ?? "";
-  const [openOnPath, setOpenOnPath] = React.useState<string | null>(null);
-  const mobileOpen = openOnPath === currentPath;
-  const headerRef = React.useRef<HTMLElement>(null);
-
-  const closeMobileMenu = React.useCallback(() => {
-    setOpenOnPath(null);
-  }, []);
-
-  const toggleMobileMenu = React.useCallback(() => {
-    setOpenOnPath((prev) => (prev === currentPath ? null : currentPath));
-  }, [currentPath]);
-
-  React.useEffect(() => {
-    if (!mobileOpen) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeMobileMenu();
-      }
-    };
-
-    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      if (
-        headerRef.current &&
-        !headerRef.current.contains(event.target as Node)
-      ) {
-        closeMobileMenu();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("mousedown", handlePointerDown);
-    window.addEventListener("touchstart", handlePointerDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("mousedown", handlePointerDown);
-      window.removeEventListener("touchstart", handlePointerDown);
-    };
-  }, [mobileOpen, closeMobileMenu]);
+  const { headerRef, mobileOpen, closeMobileMenu, toggleMobileMenu } =
+    useLandingNav();
 
   const checkLinkActive = React.useCallback(
     (href: string, idx: number) => isNavigationLinkActive(pathname, href, idx),

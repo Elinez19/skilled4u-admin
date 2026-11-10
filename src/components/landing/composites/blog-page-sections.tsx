@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Check,
@@ -25,10 +24,11 @@ import { SectionSlab } from "@/components/landing/ui/section-slab";
 import { AnimatedText } from "@/components/motion/animated-text";
 import { Reveal, ScaleSlab, Stagger, StaggerItem } from "@/components/motion/reveal";
 import {
-  type BlogCategoryId,
   landingContent,
   type WhatsNewItem,
 } from "@/content/landing";
+import { useBlogCatalog } from "@/hooks/landing/use-blog-catalog";
+import { useSocialShare } from "@/hooks/landing/use-social-share";
 import { motionTokens } from "@/lib/motion";
 import { tokens } from "@/lib/tokens";
 import { cn } from "@/lib/utils";
@@ -97,23 +97,13 @@ export function GoodStuffHeroSection() {
  */
 export function GoodStuffCatalogSection() {
   const { blogPage } = landingContent;
-  const [activeCategoryId, setActiveCategoryId] =
-    React.useState<BlogCategoryId>("all");
-  const [showAll, setShowAll] = React.useState(false);
-
-  const filteredItems = React.useMemo(() => {
-    if (activeCategoryId === "all") {
-      return blogPage.items;
-    }
-    return blogPage.items.filter(
-      (item) => item.categoryId === activeCategoryId
-    );
-  }, [activeCategoryId, blogPage.items]);
-
-  const visibleItems =
-    activeCategoryId === "all" && !showAll
-      ? filteredItems.slice(0, 3)
-      : filteredItems;
+  const {
+    activeCategoryId,
+    setActiveCategoryId,
+    showAll,
+    setShowAll,
+    visibleItems,
+  } = useBlogCatalog({ items: blogPage.items });
 
   return (
     <SectionSlab
@@ -524,17 +514,7 @@ export function BlogDetailArticleSection({
   article: WhatsNewItem;
 }) {
   const { detail } = landingContent.blogPage;
-  const [copiedSocial, setCopiedSocial] = React.useState<string | null>(null);
-
-  const handleShare = (label: string) => {
-    if (typeof window !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href).catch(() => {});
-    }
-    setCopiedSocial(label);
-    window.setTimeout(() => {
-      setCopiedSocial((prev) => (prev === label ? null : prev));
-    }, 2200);
-  };
+  const { copiedSocial, handleShare } = useSocialShare(2200);
 
   return (
     <SectionSlab

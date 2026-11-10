@@ -1,11 +1,11 @@
 "use client";
 
-import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FaqAccordion } from "@/components/landing/ui/accordion";
 import { SectionHeader, SectionSlab } from "@/components/landing/ui/section-slab";
 import { Reveal } from "@/components/motion/reveal";
-import { type FaqCategoryId, landingContent } from "@/content/landing";
+import { landingContent } from "@/content/landing";
+import { useFaqsCatalog } from "@/hooks/landing/use-faqs-catalog";
 import { motionTokens } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
@@ -17,12 +17,9 @@ import { cn } from "@/lib/utils";
  */
 export function FaqsCatalogSection() {
   const { faqsPage } = landingContent;
-  const [activeCategoryId, setActiveCategoryId] =
-    React.useState<FaqCategoryId>("customers");
-
-  const activeCategory =
-    faqsPage.categories.find((cat) => cat.id === activeCategoryId) ??
-    faqsPage.categories[0];
+  const { activeCategory, setActiveCategoryId } = useFaqsCatalog({
+    categories: faqsPage.categories,
+  });
 
   return (
     <SectionSlab id="faqs" tone="pearl">
@@ -98,4 +95,3 @@ export function FaqsCatalogSection() {
     </SectionSlab>
   );
 }
-
