@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, connection } from "next/server";
 import { protectAuthLogin } from "@/lib/arcjet";
 import {
   completeGoogleAuthentication,
@@ -32,6 +32,12 @@ function redirectToLoginWithError(
  * - Stamps role-based session timeout (Admin: 8h max / 30m idle; Artisan: 7d max / 24h idle; Customer: 30d max / 7d idle)
  */
 export async function GET(req: NextRequest) {
+  try {
+    await connection();
+  } catch {
+    // Direct invocation outside Next.js request store
+  }
+
   try {
     const blocked = await protectAuthLogin(req);
     if (blocked) return blocked;
@@ -182,6 +188,11 @@ export async function GET(req: NextRequest) {
 
     return response;
   } catch (error) {
+    if (
+      (error as { digest?: string })?.digest === "NEXT_PRERENDER_INTERRUPTED"
+    ) {
+      throw error;
+    }
     console.error("GET /api/v1/auth/google/callback error:", error);
     return redirectToLoginWithError(req, "google_oauth_failed");
   }

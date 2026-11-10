@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, connection } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { normalizeUserRole, requireAuth } from "@/lib/auth-guard";
 import { protectMutationApi } from "@/lib/arcjet";
@@ -6,6 +6,12 @@ import { db } from "@/db";
 import { bookings } from "@/db/schema";
 
 export async function GET(req: NextRequest) {
+  try {
+    await connection();
+  } catch {
+    // Direct invocation outside Next.js request store
+  }
+
   try {
     const guard = await requireAuth(req);
     if (!guard.ok) return guard.response;
@@ -27,6 +33,11 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ data: rows });
   } catch (error) {
+    if (
+      (error as { digest?: string })?.digest === "NEXT_PRERENDER_INTERRUPTED"
+    ) {
+      throw error;
+    }
     console.error("GET /api/v1/bookings error:", error);
     return NextResponse.json(
       { error: "Failed to fetch bookings" },

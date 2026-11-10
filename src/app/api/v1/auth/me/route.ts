@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, connection } from "next/server";
 import { eq, or } from "drizzle-orm";
 import {
   buildOnboardingChecklist,
@@ -15,6 +15,12 @@ import { artisans, user as userTable } from "@/db/schema";
  * Enforces sliding idle timeouts (30m Admin / 24h Artisan / 7d Client) and hard max lifetime.
  */
 export async function GET(req: NextRequest) {
+  try {
+    await connection();
+  } catch {
+    // Direct invocation outside Next.js request store
+  }
+
   try {
     const guard = await requireAuth(req);
     if (!guard.ok) {

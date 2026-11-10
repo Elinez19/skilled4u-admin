@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, connection } from "next/server";
 import { z } from "zod";
 import { protectAuthLogin } from "@/lib/arcjet";
 import {
@@ -25,6 +25,12 @@ const googlePostSchema = z.object({
  * Initiates the OAuth 2.0 Authorization Code flow with PKCE (S256) and an HMAC-signed CSRF state cookie.
  */
 export async function GET(req: NextRequest) {
+  try {
+    await connection();
+  } catch {
+    // Direct invocation outside Next.js request store
+  }
+
   const blocked = await protectAuthLogin(req);
   if (blocked) return blocked;
 

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, connection } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth-guard";
 import { protectMutationApi } from "@/lib/arcjet";
@@ -16,6 +16,12 @@ import {
  * Lists outbound and inbound emails stored in `email_logs` (Admin only).
  */
 export async function GET(req: NextRequest) {
+  try {
+    await connection();
+  } catch {
+    // Direct invocation outside Next.js request store
+  }
+
   try {
     const adminGuard = await requireAdmin(req);
     if (!adminGuard.ok) return adminGuard.response;
@@ -38,6 +44,11 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ data: rows });
   } catch (error) {
+    if (
+      (error as { digest?: string })?.digest === "NEXT_PRERENDER_INTERRUPTED"
+    ) {
+      throw error;
+    }
     console.error("GET /api/v1/emails error:", error);
     return NextResponse.json(
       { error: "Failed to fetch email logs" },

@@ -95,6 +95,11 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ data: sanitized });
   } catch (error) {
+    if (
+      (error as { digest?: string })?.digest === "NEXT_PRERENDER_INTERRUPTED"
+    ) {
+      throw error;
+    }
     console.error("GET /api/v1/artisans error:", error);
     return NextResponse.json(
       { error: "Failed to fetch artisans" },
