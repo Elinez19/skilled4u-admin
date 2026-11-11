@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, or } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import {
+  ADMIN_TRUSTED_DEVICE_COOKIE,
+  ADMIN_TRUSTED_DEVICE_TTL_SECONDS,
   applyRoleSessionPolicy,
   buildOnboardingChecklist,
   createAdminMfaChallengeToken,
+  createAdminTrustedDeviceToken,
+  getAdminCredentialFingerprint,
   hasValidAdminTrustedDeviceCookie,
   normalizeUserRole,
   resolveAdminScope,
@@ -162,15 +166,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 4. TWO-STEP ADMIN MFA (WITH 30-DAY TRUSTED DEVICE BYPASS):
-    // For Administrators without a valid 30-day trusted device cookie (or on first-time login),
-    // revoke the preliminary password-only session immediately, dispatch a 6-digit Email OTP,
-    // and return an HMAC-signed 5-minute mfaChallengeToken.
+    // 4. TWO-STEP ADMIN MFA (FIRST-LOGIN-PER-DEVICE ONLY):
+    // The 6-digit Email OTP is only required the first time an Administrator signs in on a
+    // device/browser (or after a password change/reset). Once verified, a long-lived signed
+    // trusted-device cookie skips OTP on subsequent logins and is renewed on every sign-in.
+    // Without a valid trusted device cookie, the preliminary password-only session is revoked,
+    // a 6-digit Email OTP is dispatched, and an HMAC-signed 5-minute mfaChallengeToken is returned.
     const isAdminLogin = role === "admin" || portal === "admin";
+    const credentialFingerprint = isAdminLogin
+      ? await getAdminCredentialFingerprint(dbUser.id)
+      : "";
     const isTrustedAdminDevice =
       isAdminLogin &&
       !dbUser.mustChangePassword &&
-      hasValidAdminTrustedDeviceCookie(req, dbUser.id, dbUser.email, dbUser.updatedAt);
+      hasValidAdminTrustedDeviceCookie(
+        req,
+        dbUser.id,
+        dbUser.email,
+        credentialFingerprint
+      );
 
     if (isAdminLogin && !isTrustedAdminDevice) {
       await db.delete(sessionTable).where(eq(sessionTable.token, baseToken));
@@ -273,6 +287,28 @@ export async function POST(req: NextRequest) {
         path: "/",
         maxAge: sessionPolicy.maxAgeSeconds,
       });
+    }
+
+    // Sliding renewal: keep this device trusted so the admin is not asked for an OTP again
+    if (isTrustedAdminDevice) {
+      const isHttps =
+        req.nextUrl.protocol === "https:" ||
+        req.headers.get("x-forwarded-proto") === "https";
+      response.cookies.set(
+        ADMIN_TRUSTED_DEVICE_COOKIE,
+        createAdminTrustedDeviceToken({
+          userId: dbUser.id,
+          email: dbUser.email,
+          credentialFingerprint,
+        }),
+        {
+          httpOnly: true,
+          sameSite: "lax",
+          secure: isHttps,
+          path: "/",
+          maxAge: ADMIN_TRUSTED_DEVICE_TTL_SECONDS,
+        }
+      );
     }
 
     return response;

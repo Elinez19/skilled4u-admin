@@ -61,7 +61,7 @@ export function AdminMfaStep({
             onChange={(e) => setTrustDevice(e.target.checked)}
             className="h-4 w-4 rounded border-brand-300 text-brand-700 focus:ring-accent-sky cursor-pointer"
           />
-          <span>Trust this device</span>
+          <span>Trust this device (skip this code on future sign-ins)</span>
         </label>
       )}
 

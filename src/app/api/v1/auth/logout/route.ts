@@ -62,12 +62,8 @@ export async function POST(req: NextRequest) {
       path: "/",
       maxAge: 0,
     });
-    response.cookies.set("skilled4u_admin_trusted_device", "", {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 0,
-    });
+    // NOTE: The admin trusted-device cookie is intentionally preserved on sign-out so the
+    // 6-digit OTP is only required on the first login per device (or after a password change).
 
     return response;
   } catch (error) {

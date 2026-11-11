@@ -9,6 +9,7 @@ import {
   buildOnboardingChecklist,
   consumeAdminMfaChallenge,
   createAdminTrustedDeviceToken,
+  getAdminCredentialFingerprint,
   normalizeUserRole,
   resolveAdminScope,
   verifyAdminMfaChallengeToken,
@@ -349,6 +350,9 @@ export async function POST(req: NextRequest) {
         const trustedToken = createAdminTrustedDeviceToken({
           userId: existingUser.id,
           email: existingUser.email,
+          credentialFingerprint: await getAdminCredentialFingerprint(
+            existingUser.id
+          ),
         });
         response.cookies.set(ADMIN_TRUSTED_DEVICE_COOKIE, trustedToken, {
           httpOnly: true,

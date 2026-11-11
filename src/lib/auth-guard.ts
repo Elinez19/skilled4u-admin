@@ -6,6 +6,7 @@ import { and, eq, ne, or } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
+  account as accountTable,
   session as sessionTable,
   user as userTable,
   type ArtisanRow,
@@ -240,7 +241,9 @@ export function verifyPortalRoleMatch(params: {
 // ---------------------------------------------------------------------------
 const ADMIN_MFA_TTL_MS = 5 * 60 * 1000;
 export const ADMIN_TRUSTED_DEVICE_COOKIE = "skilled4u_admin_trusted_device";
-export const ADMIN_TRUSTED_DEVICE_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+// Long-lived (sliding) device trust: OTP is only required the first time an admin signs in
+// on a given device/browser, or after their password is changed/reset.
+export const ADMIN_TRUSTED_DEVICE_TTL_SECONDS = 365 * 24 * 60 * 60; // 1 year (renewed on each trusted sign-in)
 const ADMIN_TRUSTED_DEVICE_TTL_MS = ADMIN_TRUSTED_DEVICE_TTL_SECONDS * 1000;
 
 export interface AdminMfaChallengePayload {
@@ -258,6 +261,8 @@ export interface AdminTrustedDevicePayload {
   purpose: "admin_trusted_device";
   issuedAt: number;
   expiresAt: number;
+  /** Fingerprint of the credential password hash; trust is revoked when the password changes. */
+  credentialFingerprint?: string;
 }
 
 // In-memory single-use replay protection for MFA challenge tokens
@@ -382,9 +387,36 @@ export function verifyAdminMfaChallengeToken(
   }
 }
 
+/**
+ * Returns a stable, non-reversible fingerprint of the user's current credential password hash.
+ * Changes whenever the password is changed or reset, which revokes all previously trusted devices
+ * without being affected by unrelated profile updates (name, phone, scope, etc.).
+ */
+export async function getAdminCredentialFingerprint(
+  userId: string
+): Promise<string> {
+  const [credential] = await db
+    .select({ password: accountTable.password })
+    .from(accountTable)
+    .where(
+      and(
+        eq(accountTable.userId, userId),
+        eq(accountTable.providerId, "credential")
+      )
+    )
+    .limit(1);
+
+  return crypto
+    .createHmac("sha256", getMfaSigningSecret())
+    .update(`admin-credential:${userId}:${credential?.password ?? "none"}`)
+    .digest("base64url")
+    .slice(0, 32);
+}
+
 export function createAdminTrustedDeviceToken(params: {
   userId: string;
   email: string;
+  credentialFingerprint: string;
 }): string {
   const now = Date.now();
   const payload: AdminTrustedDevicePayload = {
@@ -393,6 +425,7 @@ export function createAdminTrustedDeviceToken(params: {
     purpose: "admin_trusted_device",
     issuedAt: now,
     expiresAt: now + ADMIN_TRUSTED_DEVICE_TTL_MS,
+    credentialFingerprint: params.credentialFingerprint,
   };
   const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString(
     "base64url"
@@ -408,7 +441,7 @@ export function verifyAdminTrustedDeviceToken(
   token: string | null | undefined,
   expectedUserId: string,
   expectedEmail: string,
-  userUpdatedAt?: Date | string | null
+  expectedCredentialFingerprint: string
 ): boolean {
   if (!token || !token.includes(".")) return false;
   const parts = token.split(".");
@@ -443,13 +476,9 @@ export function verifyAdminTrustedDeviceToken(
       return false;
     }
 
-    // Invalidate if token was issued prior to user's last security update (e.g. password change or session revocation)
-    if (userUpdatedAt) {
-      const updatedMs = new Date(userUpdatedAt).getTime();
-      // Allow 5s clock skew
-      if (decoded.issuedAt < updatedMs - 5000) {
-        return false;
-      }
+    // Invalidate if the password has been changed/reset since this device was trusted
+    if (decoded.credentialFingerprint !== expectedCredentialFingerprint) {
+      return false;
     }
 
     return true;
@@ -462,7 +491,7 @@ export function hasValidAdminTrustedDeviceCookie(
   req: Request,
   userId: string,
   email: string,
-  userUpdatedAt?: Date | string | null
+  credentialFingerprint: string
 ): boolean {
   const cookieHeader = req.headers.get("cookie") || "";
   const regex = new RegExp(
@@ -471,7 +500,12 @@ export function hasValidAdminTrustedDeviceCookie(
   const match = cookieHeader.match(regex);
   if (!match?.[1]) return false;
   const rawToken = decodeURIComponent(match[1].trim());
-  return verifyAdminTrustedDeviceToken(rawToken, userId, email, userUpdatedAt);
+  return verifyAdminTrustedDeviceToken(
+    rawToken,
+    userId,
+    email,
+    credentialFingerprint
+  );
 }
 
 export function computeSessionPolicy(
