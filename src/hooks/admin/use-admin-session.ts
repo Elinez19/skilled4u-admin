@@ -1,8 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { authClient } from "@/lib/auth-client";
 import {
   ADMIN_IDLE_TIMEOUT_MS,
   ADMIN_WARNING_THRESHOLD_MS,
@@ -18,6 +16,7 @@ export interface UseAdminSessionReturn {
   adminName: string;
   adminRoleTitle: string;
   idleSecondsRemaining: number | null;
+  isSigningOut: boolean;
   handleSignOut: (reason?: "timeout" | "unauthorized") => Promise<void>;
   verifyAdminSession: () => Promise<void>;
 }
@@ -25,7 +24,6 @@ export interface UseAdminSessionReturn {
 export function useAdminSession(
   options: UseAdminSessionOptions = {}
 ): UseAdminSessionReturn {
-  const router = useRouter();
   const { onBeforeSignOut } = options;
 
   const [adminUser, setAdminUser] = useState<AdminUserProfile | null>(null);
@@ -40,27 +38,40 @@ export function useAdminSession(
   const lastActivityRef = useRef<number>(0);
   const sessionMaxExpiresRef = useRef<number | null>(null);
   const isSigningOutRef = useRef<boolean>(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleSignOut = useCallback(
     async (reason?: "timeout" | "unauthorized") => {
       if (isSigningOutRef.current) return;
       isSigningOutRef.current = true;
+      // Immediate visual feedback so the click never feels ignored
+      setIsSigningOut(true);
+      onBeforeSignOut?.();
 
+      // Revoke the session server-side (bounded so a slow DB never blocks sign-out)
+      const controller = new AbortController();
+      const abortTimer = window.setTimeout(() => controller.abort(), 4000);
       try {
-        await Promise.allSettled([
-          fetch("/api/v1/auth/logout", {
-            method: "POST",
-            credentials: "include",
-          }),
-          authClient.signOut(),
-        ]);
+        await fetch("/api/v1/auth/logout", {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+          keepalive: true,
+          signal: controller.signal,
+        });
+      } catch {
+        // Network failure/timeout: the proxy clears auth cookies on the login redirect below
       } finally {
-        onBeforeSignOut?.();
-        const target = reason === "timeout" ? "/login?reason=timeout" : "/login";
-        router.replace(target);
+        window.clearTimeout(abortTimer);
       }
+
+      // Hard navigation: bypasses the client router cache and forces the proxy to
+      // re-evaluate cookies, so the user can never be bounced back into /admin.
+      const target =
+        reason === "timeout" ? "/login?reason=timeout" : "/login?reason=signed_out";
+      window.location.replace(target);
     },
-    [onBeforeSignOut, router]
+    [onBeforeSignOut]
   );
 
   const verifyAdminSession = useCallback(async () => {
@@ -180,6 +191,7 @@ export function useAdminSession(
     adminName,
     adminRoleTitle,
     idleSecondsRemaining,
+    isSigningOut,
     handleSignOut,
     verifyAdminSession,
   };

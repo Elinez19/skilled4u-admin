@@ -2,19 +2,21 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Clock } from "lucide-react";
+import { Clock, Loader2 } from "lucide-react";
 import { CtaButton } from "@/components/landing/ui/cta-button";
 
 export interface AdminIdleWarningBannerProps {
   idleSecondsRemaining: number | null;
   onStaySignedIn: () => void;
   onSignOut: () => void;
+  isSigningOut?: boolean;
 }
 
 export function AdminIdleWarningBanner({
   idleSecondsRemaining,
   onStaySignedIn,
   onSignOut,
+  isSigningOut = false,
 }: AdminIdleWarningBannerProps) {
   return (
     <AnimatePresence>
@@ -42,6 +44,7 @@ export function AdminIdleWarningBanner({
                 variant="secondary"
                 size="xs"
                 onClick={onStaySignedIn}
+                disabled={isSigningOut}
               >
                 <span>Stay Signed In</span>
               </CtaButton>
@@ -49,8 +52,12 @@ export function AdminIdleWarningBanner({
                 variant="primary"
                 size="xs"
                 onClick={onSignOut}
+                disabled={isSigningOut}
               >
-                <span>Sign Out</span>
+                {isSigningOut && <Loader2 className="h-3 w-3 animate-spin" />}
+                <span aria-live="polite">
+                  {isSigningOut ? "Signing out..." : "Sign Out"}
+                </span>
               </CtaButton>
             </div>
           </div>

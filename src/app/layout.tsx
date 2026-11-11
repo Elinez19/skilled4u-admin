@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
+import { ScrollProgressBar } from "@/components/motion/scroll-progress-bar";
+import { ScrollToTopButton } from "@/components/motion/scroll-to-top-button";
 import "./globals.css";
 
 const bricolageDisplay = Bricolage_Grotesque({
@@ -39,7 +41,9 @@ export default function RootLayout({
         suppressHydrationWarning
         className="min-h-full flex flex-col bg-surface-pearl text-ink-primary"
       >
+        <ScrollProgressBar />
         {children}
+        <ScrollToTopButton />
       </body>
     </html>
   );

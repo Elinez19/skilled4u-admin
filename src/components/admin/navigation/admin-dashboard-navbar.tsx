@@ -24,6 +24,7 @@ export function AdminDashboardNavbar({
   mobileOpen,
   onToggleMobile,
   onSignOut,
+  isSigningOut = false,
   adminUser,
 }: AdminDashboardNavbarProps) {
   const activeItem = resolveActiveNavItem(pathname);
@@ -37,7 +38,6 @@ export function AdminDashboardNavbar({
     matchingModules,
     handleKeyDown,
     selectModule,
-    clearSearch,
   } = useAdminSearch();
 
   const {
@@ -161,6 +161,7 @@ export function AdminDashboardNavbar({
               showAvatarImage={showAvatarImage}
               onImageError={handleImageError}
               onSignOut={onSignOut}
+              isSigningOut={isSigningOut}
             />
           </div>
         </div>

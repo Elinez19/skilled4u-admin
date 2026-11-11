@@ -82,10 +82,22 @@ export function proxy(request: NextRequest) {
   if (isLoginRoute && sessionCookie) {
     const reason = searchParams.get("reason");
     const oauthError = searchParams.get("error");
-    if (reason === "timeout" || reason === "unauthorized" || oauthError) {
+    if (
+      reason === "timeout" ||
+      reason === "unauthorized" ||
+      reason === "signed_out" ||
+      oauthError
+    ) {
+      // Fallback cookie cleanup (e.g. if the logout API call failed or timed out)
       const response = NextResponse.next();
       response.cookies.delete("better-auth.session_token");
-      response.cookies.delete("__Secure-better-auth.session_token");
+      response.cookies.set("__Secure-better-auth.session_token", "", {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: true,
+        path: "/",
+        maxAge: 0,
+      });
       return response;
     }
     return NextResponse.redirect(new URL("/admin", request.url));

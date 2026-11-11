@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  Loader2,
   Lock,
   LogOut,
   ShieldCheck,
@@ -27,6 +28,7 @@ export interface AdminProfileDropdownProps {
   showAvatarImage: boolean;
   onImageError: () => void;
   onSignOut: () => void;
+  isSigningOut?: boolean;
 }
 
 export function AdminProfileDropdown({
@@ -38,6 +40,7 @@ export function AdminProfileDropdown({
   showAvatarImage,
   onImageError,
   onSignOut,
+  isSigningOut = false,
 }: AdminProfileDropdownProps) {
   return (
     <div ref={profileRef} className="relative">
@@ -252,17 +255,27 @@ export function AdminProfileDropdown({
               <button
                 type="button"
                 role="menuitem"
+                disabled={isSigningOut}
+                aria-busy={isSigningOut}
                 onClick={() => {
-                  onClose();
+                  // Keep the menu open so the inline progress state stays visible
                   onSignOut();
                 }}
-                className="group flex w-full items-center justify-between gap-2 rounded-xl border border-brand-200 bg-surface-porcelain px-3 py-2 text-xs font-extrabold text-brand-950 transition-all hover:border-brand-600 hover:bg-brand-600 hover:text-ink-on-blue shadow-gloss-card cursor-pointer"
+                className="group flex w-full items-center justify-between gap-2 rounded-xl border border-brand-200 bg-surface-porcelain px-3 py-2 text-xs font-extrabold text-brand-950 transition-all hover:border-brand-600 hover:bg-brand-600 hover:text-ink-on-blue shadow-gloss-card cursor-pointer disabled:cursor-wait disabled:border-brand-600 disabled:bg-brand-600 disabled:text-ink-on-blue"
               >
                 <div className="flex items-center gap-2">
-                  <LogOut className="h-3.5 w-3.5 text-brand-600 group-hover:text-ink-on-blue transition-colors" />
-                  <span>Sign Out</span>
+                  {isSigningOut ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-ink-on-blue" />
+                  ) : (
+                    <LogOut className="h-3.5 w-3.5 text-brand-600 group-hover:text-ink-on-blue transition-colors" />
+                  )}
+                  <span aria-live="polite">
+                    {isSigningOut ? "Signing out..." : "Sign Out"}
+                  </span>
                 </div>
-                <ChevronRight className="h-3.5 w-3.5 text-brand-400 group-hover:text-ink-on-blue group-hover:translate-x-0.5 transition-transform" />
+                {!isSigningOut && (
+                  <ChevronRight className="h-3.5 w-3.5 text-brand-400 group-hover:text-ink-on-blue group-hover:translate-x-0.5 transition-transform" />
+                )}
               </button>
             </div>
           </motion.div>

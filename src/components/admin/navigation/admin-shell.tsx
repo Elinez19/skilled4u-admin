@@ -28,20 +28,41 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     adminName,
     adminRoleTitle,
     idleSecondsRemaining,
+    isSigningOut,
     handleSignOut,
     verifyAdminSession,
-  } = useAdminSession({
-    onBeforeSignOut: closeMobileSidebar,
-  });
+  } = useAdminSession();
 
   return (
     <div className="no-scrollbar min-h-screen flex bg-surface-pearl text-ink-primary">
+      {/* Non-blocking sign-out progress bar (the clicked button also shows an inline spinner) */}
+      <AnimatePresence>
+        {isSigningOut && (
+          <motion.div
+            role="progressbar"
+            aria-label="Signing out"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="pointer-events-none fixed inset-x-0 top-0 z-[80] h-[3px] overflow-hidden bg-brand-100/70"
+          >
+            <motion.div
+              className="h-full w-2/5 rounded-pill bg-gradient-to-r from-accent-sky via-brand-600 to-accent-gold"
+              initial={{ x: "-100%" }}
+              animate={{ x: "250%" }}
+              transition={{ duration: 1.1, ease: "easeInOut", repeat: Infinity }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Desktop Sticky Sidebar (Premium Glossy White, No Scrollbars) */}
       <aside className="hidden lg:block lg:w-60 xl:w-64 shrink-0">
         <div className="sticky top-0 h-screen overflow-hidden">
           <AdminSidebar
             pathname={pathname}
             onSignOut={() => handleSignOut()}
+            isSigningOut={isSigningOut}
             adminName={adminName}
             adminRoleTitle={adminRoleTitle}
           />
@@ -72,6 +93,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 pathname={pathname}
                 onNavigate={closeMobileSidebar}
                 onSignOut={() => handleSignOut()}
+                isSigningOut={isSigningOut}
                 adminName={adminName}
                 adminRoleTitle={adminRoleTitle}
               />
@@ -87,6 +109,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           mobileOpen={mobileOpen}
           onToggleMobile={toggleMobileSidebar}
           onSignOut={() => handleSignOut()}
+          isSigningOut={isSigningOut}
           adminUser={adminUser}
         />
 
@@ -95,6 +118,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           idleSecondsRemaining={idleSecondsRemaining}
           onStaySignedIn={() => verifyAdminSession()}
           onSignOut={() => handleSignOut()}
+          isSigningOut={isSigningOut}
         />
 
         {/* Main Admin Content Area */}

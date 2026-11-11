@@ -33,6 +33,7 @@ export interface AdminDashboardNavbarProps {
   mobileOpen: boolean;
   onToggleMobile: () => void;
   onSignOut: () => void;
+  isSigningOut?: boolean;
   adminUser?: AdminUserProfile | null;
 }
 
@@ -40,6 +41,7 @@ export interface AdminSidebarProps {
   pathname: string | null;
   onNavigate?: () => void;
   onSignOut: () => void;
+  isSigningOut?: boolean;
   adminName?: string;
   adminRoleTitle?: string;
 }

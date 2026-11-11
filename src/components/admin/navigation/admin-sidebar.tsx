@@ -3,7 +3,14 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ChevronRight, Lock, LogOut, ShieldCheck, Users } from "lucide-react";
+import {
+  ChevronRight,
+  Loader2,
+  Lock,
+  LogOut,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import { BrandLogo } from "@/components/brand/logo";
 import { OffsetRing } from "@/components/brand/offset-ring";
 import { ToolPattern } from "@/components/brand/tool-pattern";
@@ -19,6 +26,7 @@ export function AdminSidebar({
   pathname,
   onNavigate,
   onSignOut,
+  isSigningOut = false,
   adminName,
   adminRoleTitle,
 }: AdminSidebarProps) {
@@ -156,10 +164,17 @@ export function AdminSidebar({
           variant="primary"
           size="xs"
           onClick={onSignOut}
+          disabled={isSigningOut}
           className="w-full px-2 text-[11px]"
         >
-          <LogOut className="h-3 w-3" />
-          <span>Sign Out</span>
+          {isSigningOut ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <LogOut className="h-3 w-3" />
+          )}
+          <span aria-live="polite">
+            {isSigningOut ? "Signing out..." : "Sign Out"}
+          </span>
         </CtaButton>
       </div>
     </div>
