@@ -53,6 +53,7 @@ export const INITIAL_ADMINS: AdminRecord[] = [
     id: "adm_1",
     name: "Elijah Admin",
     email: "admin@skilled4u.ng",
+    phone: "+234 803 550 1920",
     roleTitle: "Super Administrator",
     permissions:
       "Full access: Users, Bookings, Financials, Disputes & Settings",
@@ -64,6 +65,7 @@ export const INITIAL_ADMINS: AdminRecord[] = [
     id: "adm_2",
     name: "Funke Oladipo",
     email: "trust@skilled4u.ng",
+    phone: "+234 812 400 8821",
     roleTitle: "KYC & Dispute Moderator",
     permissions:
       "Artisan identity verification, dispute claims & review moderation",
@@ -75,6 +77,7 @@ export const INITIAL_ADMINS: AdminRecord[] = [
     id: "adm_3",
     name: "Sadiq Abdullahi",
     email: "dispatch@skilled4u.ng",
+    phone: "+234 805 700 9912",
     roleTitle: "Dispatch & Support Lead",
     permissions:
       "Live booking dispatch, schedule updates & customer helpdesk",
@@ -129,6 +132,7 @@ export const DEFAULT_USER_FORM_DATA: ArtisanUserFormData = {
   name: "",
   email: "",
   phone: "+234 803 550 1920",
+  password: "",
   city: "Abuja (Wuse II)",
   trade: "AC & Refrigeration Specialist",
   hourlyRateNumeric: "15000",

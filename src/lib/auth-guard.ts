@@ -142,17 +142,22 @@ export function assertCanManageTarget(
   actionDescription?: string
 ): { ok: true } | { ok: false; error: string; status: number } {
   if (actor.id === targetUser.id) {
-    return {
-      ok: false,
-      status: 400,
-      error: "You cannot modify status, suspend, or delete your own administrator account.",
-    };
+    if (
+      actionDescription === "delete" ||
+      actionDescription === "suspend"
+    ) {
+      return {
+        ok: false,
+        status: 400,
+        error: `You cannot ${actionDescription} your own administrator account.`,
+      };
+    }
   }
 
   const targetRole = normalizeUserRole(targetUser.role);
   const actorScope = resolveAdminScope(actor);
 
-  if (targetRole === "admin") {
+  if (targetRole === "admin" && actor.id !== targetUser.id) {
     if (actorScope !== "super_admin") {
       return {
         ok: false,

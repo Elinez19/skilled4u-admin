@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Save, UserPlus } from "lucide-react";
+import { Eye, EyeOff, Save, UserPlus } from "lucide-react";
 import {
   AdminInlineForm,
   AdminSelectField,
@@ -53,16 +53,19 @@ export function ArtisanUserForm({
   saving,
   savedMessage,
 }: ArtisanUserFormProps) {
+  const [showPassword, setShowPassword] = React.useState(false);
   const isEditing = Boolean(formData.editingId);
+  const isAdminEdit = isEditing && formData.formGroup === "admin";
 
   const getFormTitle = () => {
+    if (isAdminEdit) {
+      return "Edit Administrator Details";
+    }
     if (isEditing) {
       return `Edit ${
         formData.formGroup === "artisan"
           ? "Artisan Pro"
-          : formData.formGroup === "customer"
-            ? "Customer"
-            : "Administrator"
+          : "Customer"
       } Account`;
     }
     return formData.formGroup === "artisan"
@@ -74,13 +77,12 @@ export function ArtisanUserForm({
 
   const getSubmitLabel = () => {
     if (saving) return "Saving...";
+    if (isAdminEdit) {
+      return "Save changes";
+    }
     if (isEditing) {
       return `Update ${
-        formData.formGroup === "artisan"
-          ? "Artisan"
-          : formData.formGroup === "customer"
-            ? "Customer"
-            : "Admin"
+        formData.formGroup === "artisan" ? "Artisan" : "Customer"
       }`;
     }
     return formData.formGroup === "artisan"
@@ -93,9 +95,13 @@ export function ArtisanUserForm({
   return (
     <AdminInlineForm
       formRef={formRef}
-      eyebrow="Inline Identity & Credentials Form"
+      eyebrow={isAdminEdit ? "Administrator Edit Desk" : "Inline Identity & Credentials Form"}
       title={getFormTitle()}
-      description="Manage marketplace accounts directly. Switch entity role below to register a customer, onboard a verified artisan pro, or grant internal administrator privileges."
+      description={
+        isAdminEdit
+          ? "Update identity details, active email, phone contact, credentials, and access scope with single-action confirmation."
+          : "Manage marketplace accounts directly. Switch entity role below to register a customer, onboard a verified artisan pro, or grant internal administrator privileges."
+      }
       isEditing={isEditing}
       editingBadgeText={formData.name || "User"}
       onResetToCreate={onReset}
@@ -104,118 +110,68 @@ export function ArtisanUserForm({
       savedMessage={savedMessage}
     >
       <form onSubmit={onSubmit} className="space-y-4">
-        {/* User Role Group Selector */}
-        <AdminSelectPills
-          label="Account Role Type"
-          options={USER_GROUP_OPTIONS}
-          value={formData.formGroup}
-          onChange={(g) => onSetFormGroup(g as FormUserGroup)}
-          columns={3}
-        />
-
-        {/* Shared Basic Identity Fields */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <AdminTextField
-            label="Full Legal Name"
-            value={formData.name}
-            onChange={(e) => onUpdateField("name", e.target.value)}
-            required
+        {/* User Role Group Selector (Hidden during admin edit for focus) */}
+        {!isAdminEdit && (
+          <AdminSelectPills
+            label="Account Role Type"
+            options={USER_GROUP_OPTIONS}
+            value={formData.formGroup}
+            onChange={(g) => onSetFormGroup(g as FormUserGroup)}
+            columns={3}
           />
-          <AdminTextField
-            label="Email Address"
-            type="email"
-            value={formData.email}
-            onChange={(e) => onUpdateField("email", e.target.value)}
-            required
-          />
-          <AdminTextField
-            label="Phone Number"
-            value={formData.phone}
-            onChange={(e) => onUpdateField("phone", e.target.value)}
-            required
-          />
-          <AdminTextField
-            label="Primary City / Hub"
-            value={formData.city}
-            onChange={(e) => onUpdateField("city", e.target.value)}
-            required
-          />
-        </div>
-
-        {/* Dynamic Fields: Artisan Pro */}
-        {formData.formGroup === "artisan" && (
-          <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <AdminTextField
-                label="Primary Trade & Specialization"
-                value={formData.trade}
-                onChange={(e) => onUpdateField("trade", e.target.value)}
-                required
-              />
-              <AdminTextField
-                label="Hourly Base Rate (NGN)"
-                type="number"
-                min={1000}
-                value={formData.hourlyRateNumeric}
-                onChange={(e) =>
-                  onUpdateField("hourlyRateNumeric", e.target.value)
-                }
-                required
-              />
-              <AdminTextField
-                label="National ID (NIN) Number"
-                value={formData.ninNumber}
-                onChange={(e) => onUpdateField("ninNumber", e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <AdminTextField
-                label="Payout Bank Name"
-                value={formData.bankName}
-                onChange={(e) => onUpdateField("bankName", e.target.value)}
-                required
-              />
-              <AdminTextField
-                label="Payout Bank Account Number"
-                value={formData.bankAccountNumber}
-                onChange={(e) =>
-                  onUpdateField("bankAccountNumber", e.target.value)
-                }
-                required
-              />
-              <AdminSelectPills
-                label="Artisan KYC Status"
-                options={ARTISAN_KYC_OPTIONS}
-                value={formData.kycStatus}
-                onChange={(st) =>
-                  onUpdateField("kycStatus", st as ArtisanKycStatus)
-                }
-                columns={3}
-              />
-            </div>
-          </>
         )}
 
-        {/* Dynamic Fields: Customer */}
-        {formData.formGroup === "customer" && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <AdminSelectPills
-              label="Customer Account Standing"
-              options={CUSTOMER_STATUS_OPTIONS}
-              value={formData.customerStatus}
-              onChange={(st) =>
-                onUpdateField("customerStatus", st as CustomerAccountStatus)
-              }
-              columns={3}
-            />
-          </div>
-        )}
-
-        {/* Dynamic Fields: Admin Staff */}
-        {formData.formGroup === "admin" && (
+        {/* Admin-Specific Identity & Credentials Layout */}
+        {formData.formGroup === "admin" ? (
           <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <AdminTextField
+                label="Full Legal Name"
+                value={formData.name}
+                onChange={(e) => onUpdateField("name", e.target.value)}
+                required
+              />
+              <AdminTextField
+                label="Email Address"
+                type="email"
+                value={formData.email}
+                onChange={(e) => onUpdateField("email", e.target.value)}
+                required
+              />
+              <AdminTextField
+                label="Phone Number"
+                value={formData.phone}
+                onChange={(e) => onUpdateField("phone", e.target.value)}
+                required
+              />
+              <AdminTextField
+                label={isEditing ? "Password (Leave blank to keep)" : "Admin Password"}
+                type={showPassword ? "text" : "password"}
+                placeholder={isEditing ? "Leave blank to keep current" : "Min 8 characters"}
+                value={formData.password || ""}
+                onChange={(e) => onUpdateField("password", e.target.value)}
+                hint={
+                  isEditing
+                    ? "Leave blank to preserve current password"
+                    : "Temporary or permanent password (min 8 chars)"
+                }
+                trailingIcon={
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-ink-muted hover:text-brand-900 cursor-pointer p-1"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                }
+              />
+            </div>
+
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <AdminSelectField<AdminScopeOption>
                 label="System Access Level & RBAC Scope"
@@ -252,19 +208,120 @@ export function ArtisanUserForm({
               />
             </div>
           </div>
+        ) : (
+          <>
+            {/* Shared Basic Identity Fields for Artisan & Customer */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <AdminTextField
+                label="Full Legal Name"
+                value={formData.name}
+                onChange={(e) => onUpdateField("name", e.target.value)}
+                required
+              />
+              <AdminTextField
+                label="Email Address"
+                type="email"
+                value={formData.email}
+                onChange={(e) => onUpdateField("email", e.target.value)}
+                required
+              />
+              <AdminTextField
+                label="Phone Number"
+                value={formData.phone}
+                onChange={(e) => onUpdateField("phone", e.target.value)}
+                required
+              />
+              <AdminTextField
+                label="Primary City / Hub"
+                value={formData.city}
+                onChange={(e) => onUpdateField("city", e.target.value)}
+                required
+              />
+            </div>
+
+            {/* Dynamic Fields: Artisan Pro */}
+            {formData.formGroup === "artisan" && (
+              <>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <AdminTextField
+                    label="Primary Trade & Specialization"
+                    value={formData.trade}
+                    onChange={(e) => onUpdateField("trade", e.target.value)}
+                    required
+                  />
+                  <AdminTextField
+                    label="Hourly Base Rate (NGN)"
+                    type="number"
+                    min={1000}
+                    value={formData.hourlyRateNumeric}
+                    onChange={(e) =>
+                      onUpdateField("hourlyRateNumeric", e.target.value)
+                    }
+                    required
+                  />
+                  <AdminTextField
+                    label="National ID (NIN) Number"
+                    value={formData.ninNumber}
+                    onChange={(e) => onUpdateField("ninNumber", e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <AdminTextField
+                    label="Payout Bank Name"
+                    value={formData.bankName}
+                    onChange={(e) => onUpdateField("bankName", e.target.value)}
+                    required
+                  />
+                  <AdminTextField
+                    label="Payout Bank Account Number"
+                    value={formData.bankAccountNumber}
+                    onChange={(e) =>
+                      onUpdateField("bankAccountNumber", e.target.value)
+                    }
+                    required
+                  />
+                  <AdminSelectPills
+                    label="Artisan KYC Status"
+                    options={ARTISAN_KYC_OPTIONS}
+                    value={formData.kycStatus}
+                    onChange={(st) =>
+                      onUpdateField("kycStatus", st as ArtisanKycStatus)
+                    }
+                    columns={3}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Dynamic Fields: Customer */}
+            {formData.formGroup === "customer" && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <AdminSelectPills
+                  label="Customer Account Standing"
+                  options={CUSTOMER_STATUS_OPTIONS}
+                  value={formData.customerStatus}
+                  onChange={(st) =>
+                    onUpdateField("customerStatus", st as CustomerAccountStatus)
+                  }
+                  columns={3}
+                />
+              </div>
+            )}
+          </>
         )}
 
-        {/* Submission Actions */}
+        {/* Submission Actions: Single focused CTA for Admin Edit */}
         <div className="flex flex-wrap items-center justify-end gap-3 pt-3 border-t border-surface-frost">
           {isEditing && (
-            <CtaButton
+            <button
               type="button"
-              variant="secondary"
-              size="sm"
               onClick={onReset}
+              className="text-xs font-semibold text-ink-secondary hover:text-brand-900 transition-colors px-2 py-1 cursor-pointer"
             >
-              Cancel Edit
-            </CtaButton>
+              Cancel
+            </button>
           )}
           <CtaButton
             type="submit"

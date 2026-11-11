@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { NextRequest, NextResponse, connection } from "next/server";
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { hashPassword } from "better-auth/crypto";
 import { auth } from "@/lib/auth";
 import {
   assertCanManageTarget,
@@ -12,6 +13,7 @@ import { protectMutationApi } from "@/lib/arcjet";
 import { recordAdminAudit } from "@/lib/audit";
 import { db } from "@/db";
 import {
+  account as accountTable,
   bookings,
   session as sessionTable,
   user as userTable,
@@ -271,6 +273,7 @@ export async function PATCH(req: NextRequest) {
       name,
       email,
       phone,
+      password,
       city,
       address,
       role,
@@ -315,10 +318,18 @@ export async function PATCH(req: NextRequest) {
 
     // Enforce target protection and RBAC
     for (const targetUser of targetUsers) {
+      const isSelf = adminGuard.auth.user.id === targetUser.id;
+      if (isSelf && (accountStatus === "suspended" || banned === true)) {
+        return NextResponse.json(
+          { error: "You cannot suspend your own administrator account." },
+          { status: 400 }
+        );
+      }
+
       const check = assertCanManageTarget(
         adminGuard.auth.user,
         targetUser,
-        "modify or suspend"
+        accountStatus === "suspended" || banned === true ? "suspend" : "modify"
       );
       if (!check.ok) {
         return NextResponse.json(
@@ -347,9 +358,82 @@ export async function PATCH(req: NextRequest) {
 
     if (typeof name === "string" && name.trim()) updateValues.name = name.trim();
     if (typeof email === "string" && email.trim()) {
-      updateValues.email = email.trim().toLowerCase();
+      const normalizedEmail = email.trim().toLowerCase();
+      // Ensure email uniqueness across other users
+      const [existingWithEmail] = await db
+        .select({ id: userTable.id, role: userTable.role })
+        .from(userTable)
+        .where(
+          and(
+            eq(userTable.email, normalizedEmail),
+            ne(userTable.id, targetUsers[0].id)
+          )
+        )
+        .limit(1);
+
+      if (existingWithEmail) {
+        return NextResponse.json(
+          {
+            error: `An account with this email address already exists (${normalizeUserRole(
+              existingWithEmail.role
+            )} role). Each email is strictly bound to one account.`,
+            code: "EMAIL_ALREADY_EXISTS",
+          },
+          { status: 409 }
+        );
+      }
+      updateValues.email = normalizedEmail;
     }
     if (typeof phone === "string") updateValues.phone = phone.trim();
+
+    // Password rotation / update support
+    let passwordRotated = false;
+    if (typeof password === "string" && password.trim().length > 0) {
+      const trimmedPassword = password.trim();
+      if (trimmedPassword.length < 8) {
+        return NextResponse.json(
+          { error: "New password must be at least 8 characters long." },
+          { status: 400 }
+        );
+      }
+
+      const hashedPassword = await hashPassword(trimmedPassword);
+      for (const targetUser of targetUsers) {
+        const [existingAccount] = await db
+          .select({ id: accountTable.id })
+          .from(accountTable)
+          .where(
+            and(
+              eq(accountTable.userId, targetUser.id),
+              eq(accountTable.providerId, "credential")
+            )
+          )
+          .limit(1);
+
+        if (existingAccount) {
+          await db
+            .update(accountTable)
+            .set({
+              password: hashedPassword,
+              updatedAt: new Date(),
+            })
+            .where(eq(accountTable.id, existingAccount.id));
+        } else {
+          await db.insert(accountTable).values({
+            id: crypto.randomUUID(),
+            userId: targetUser.id,
+            accountId: targetUser.id,
+            providerId: "credential",
+            password: hashedPassword,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        }
+      }
+
+      updateValues.mustChangePassword = false;
+      passwordRotated = true;
+    }
     if (typeof city === "string") updateValues.city = city.trim();
     if (typeof address === "string") updateValues.address = address.trim();
     if (typeof role === "string") {
@@ -427,6 +511,7 @@ export async function PATCH(req: NextRequest) {
         targetRole: targetUser.role,
         details: {
           updatedFields: Object.keys(updateValues),
+          passwordRotated,
           banReason: banReason || null,
         },
       });

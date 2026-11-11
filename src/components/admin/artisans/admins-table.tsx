@@ -39,6 +39,9 @@ export interface AdminsTableProps {
   onAddNewAdmin: () => void;
   onEditAdmin: (admin: AdminRecord) => void;
   onToggleStatus: (id: string) => void;
+  onSoftDeleteAdmin?: (admin: AdminRecord) => void;
+  onHardDeleteAdmin?: (admin: AdminRecord) => void;
+  onReactivateAdmin?: (admin: AdminRecord) => void;
   onRevokeSessions?: (id: string) => void;
   onResetPassword?: (id: string) => void;
   onResendInvite?: (id: string) => void;
@@ -55,6 +58,9 @@ export function AdminsTable({
   onAddNewAdmin,
   onEditAdmin,
   onToggleStatus,
+  onSoftDeleteAdmin,
+  onHardDeleteAdmin,
+  onReactivateAdmin,
   onRevokeSessions,
   onResetPassword,
   onResendInvite,
@@ -173,6 +179,7 @@ export function AdminsTable({
                     </div>
                     <div className="text-[11px] font-semibold text-ink-secondary">
                       {adm.email}
+                      {adm.phone ? ` • ${adm.phone}` : ""}
                     </div>
                   </AdminTableCell>
 
@@ -213,8 +220,8 @@ export function AdminsTable({
                       items={[
                         {
                           id: "edit",
-                          label: "Edit Admin in Form",
-                          description: "Modify role & clearance scope",
+                          label: "Edit Admin Details",
+                          description: "Update name, email, phone, password & role",
                           icon: <Pencil className="h-3.5 w-3.5" />,
                           variant: "primary",
                           onClick: () => onEditAdmin(adm),
@@ -223,16 +230,24 @@ export function AdminsTable({
                           id: "toggle-status",
                           label: isSuspended
                             ? "Reactivate Administrator"
-                            : "Suspend Administrator",
+                            : "Soft Delete (Suspend Access)",
                           description: isSuspended
-                            ? "Restore admin access"
-                            : "Immediately revoke sessions and block access",
+                            ? "Restore admin access and privileges"
+                            : "Revoke active sessions and block portal login",
                           icon: isSuspended ? (
                             <ShieldCheck className="h-3.5 w-3.5 text-accent-success" />
                           ) : (
                             <ShieldAlert className="h-3.5 w-3.5 text-accent-warm" />
                           ),
-                          onClick: () => onToggleStatus(adm.id),
+                          onClick: () => {
+                            if (isSuspended) {
+                              if (onReactivateAdmin) onReactivateAdmin(adm);
+                              else onToggleStatus(adm.id);
+                            } else {
+                              if (onSoftDeleteAdmin) onSoftDeleteAdmin(adm);
+                              else onToggleStatus(adm.id);
+                            }
+                          },
                         },
                         ...(onRevokeSessions
                           ? [
@@ -269,12 +284,15 @@ export function AdminsTable({
                           : []),
                         {
                           id: "delete",
-                          label: "Permanently Remove Account",
-                          description: "Hard delete administrator profile",
+                          label: "Hard Delete (Permanently Remove)",
+                          description: "Completely erase administrator account",
                           icon: <Trash2 className="h-3.5 w-3.5" />,
                           variant: "danger",
                           dividerBefore: true,
-                          onClick: () => onDeleteAdmin(adm.id),
+                          onClick: () => {
+                            if (onHardDeleteAdmin) onHardDeleteAdmin(adm);
+                            else onDeleteAdmin(adm.id);
+                          },
                         },
                       ]}
                     />

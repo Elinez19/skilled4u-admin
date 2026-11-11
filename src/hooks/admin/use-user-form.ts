@@ -118,6 +118,8 @@ export function useUserForm(): UseUserFormReturn {
         editingId: adm.id,
         name: adm.name,
         email: adm.email,
+        phone: adm.phone || "+234 803 550 1920",
+        password: "",
         roleTitle: adm.roleTitle,
         permissions: adm.permissions,
         adminScope: adm.adminScope || "dispatch_support",

@@ -5,6 +5,8 @@ import { AdminLoadingState } from "@/components/admin/ui/admin-loading-state";
 import { db } from "@/db";
 import { artisans, bookings, categories, payments } from "@/db/schema";
 
+export const instant = false;
+
 async function OverviewLoader() {
   const [allArtisans, allBookings, allPayments, allCategories] =
     await Promise.all([

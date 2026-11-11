@@ -33,6 +33,7 @@ export interface UseArtisansKycReturn {
   toggleCustomerStatus: (id: string) => Promise<void>;
   deleteCustomer: (id: string, onDeleted?: () => void) => Promise<void>;
   toggleAdminStatus: (id: string) => Promise<void>;
+  softDeleteAdmin: (id: string, onDeleted?: () => void) => Promise<boolean>;
   deleteAdmin: (id: string, onDeleted?: () => void) => Promise<void>;
   revokeUserSessions: (userId: string) => Promise<boolean>;
   resetUserPassword: (userId: string) => Promise<boolean>;
@@ -127,6 +128,7 @@ export function useArtisansKyc(
         id: u.id,
         name: u.name,
         email: u.email,
+        phone: u.phone || "+234 803 550 1920",
         roleTitle: u.adminRoleTitle || "Operations Administrator",
         permissions:
           u.adminPermissions ||
@@ -359,6 +361,50 @@ export function useArtisansKyc(
     [admins, notifySaved, router]
   );
 
+  const softDeleteAdmin = useCallback(
+    async (id: string, onDeleted?: () => void): Promise<boolean> => {
+      setBusyId(id);
+      try {
+        const res = await fetch("/api/v1/users", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id,
+            accountStatus: "suspended",
+            banned: true,
+            banReason: "Administrator access soft-deleted (suspended)",
+          }),
+        });
+
+        if (res.ok) {
+          setAdmins((prev) =>
+            prev.map((adm) =>
+              adm.id === id
+                ? {
+                    ...adm,
+                    status: "suspended",
+                    lastActive: "Account Suspended",
+                    banned: true,
+                  }
+                : adm
+            )
+          );
+          notifySaved("Deleted successfully");
+          router.refresh();
+          onDeleted?.();
+          return true;
+        } else {
+          const err = await res.json().catch(() => ({}));
+          notifySaved(err.error || "Failed to soft delete administrator account");
+          return false;
+        }
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [notifySaved, router]
+  );
+
   const deleteAdmin = useCallback(
     async (id: string, onDeleted?: () => void) => {
       setBusyId(id);
@@ -369,7 +415,7 @@ export function useArtisansKyc(
         if (res.ok) {
           setAdmins((prev) => prev.filter((adm) => adm.id !== id));
           onDeleted?.();
-          notifySaved("Administrator access revoked and record deleted");
+          notifySaved("Deleted successfully");
           router.refresh();
         } else {
           const err = await res.json().catch(() => ({}));
@@ -655,6 +701,8 @@ export function useArtisansKyc(
                 id: formData.editingId,
                 name: formData.name,
                 email: formData.email,
+                phone: formData.phone,
+                password: formData.password?.trim() ? formData.password.trim() : undefined,
                 role: "admin",
                 adminScope: formData.adminScope,
                 accountStatus: formData.adminStatus,
@@ -671,6 +719,7 @@ export function useArtisansKyc(
                         ...adm,
                         name: formData.name,
                         email: formData.email,
+                        phone: formData.phone,
                         roleTitle: formData.roleTitle,
                         permissions: formData.permissions,
                         adminScope: formData.adminScope,
@@ -694,6 +743,8 @@ export function useArtisansKyc(
               body: JSON.stringify({
                 name: formData.name,
                 email: formData.email,
+                phone: formData.phone,
+                password: formData.password?.trim() ? formData.password.trim() : undefined,
                 role: "admin",
                 adminScope: formData.adminScope,
                 accountStatus: formData.adminStatus,
@@ -708,6 +759,7 @@ export function useArtisansKyc(
                 id: created.id,
                 name: created.name,
                 email: created.email,
+                phone: created.phone || formData.phone,
                 roleTitle: created.adminRoleTitle || formData.roleTitle,
                 permissions: created.adminPermissions || formData.permissions,
                 adminScope: formData.adminScope,
@@ -778,6 +830,7 @@ export function useArtisansKyc(
     toggleCustomerStatus,
     deleteCustomer,
     toggleAdminStatus,
+    softDeleteAdmin,
     deleteAdmin,
     revokeUserSessions,
     resetUserPassword,

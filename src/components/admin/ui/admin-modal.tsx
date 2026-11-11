@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { AdminInlineForm } from "@/components/admin/ui/admin-form-controls";
+export * from "./admin-dialog-modal";
 
 export interface AdminModalProps {
   open: boolean;

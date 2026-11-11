@@ -28,6 +28,7 @@ export interface AdminRecord {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   roleTitle: string;
   permissions: string;
   adminScope: AdminScopeOption;
@@ -43,6 +44,7 @@ export interface ArtisanUserFormData {
   name: string;
   email: string;
   phone: string;
+  password?: string;
   city: string;
 
   // Artisan fields

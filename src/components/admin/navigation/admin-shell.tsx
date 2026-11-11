@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useAdminNav } from "@/hooks/admin/use-admin-nav";
 import { useAdminSession } from "@/hooks/admin/use-admin-session";
 import { motionTokens } from "@/lib/motion";
+import { AdminToastProvider } from "@/components/admin/ui/admin-toast";
 import { AdminDashboardNavbar } from "./admin-dashboard-navbar";
 import { AdminIdleWarningBanner } from "./admin-idle-warning-banner";
 import { AdminSidebar } from "./admin-sidebar";
@@ -34,8 +35,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   } = useAdminSession();
 
   return (
-    <div className="no-scrollbar min-h-screen flex bg-surface-pearl text-ink-primary">
-      {/* Non-blocking sign-out progress bar (the clicked button also shows an inline spinner) */}
+    <AdminToastProvider>
+      <div className="no-scrollbar min-h-screen flex bg-surface-pearl text-ink-primary">
+        {/* Non-blocking sign-out progress bar (the clicked button also shows an inline spinner) */}
       <AnimatePresence>
         {isSigningOut && (
           <motion.div
@@ -127,6 +129,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
     </div>
+    </AdminToastProvider>
   );
 }
 
