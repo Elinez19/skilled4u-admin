@@ -22,7 +22,7 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
-    minPasswordLength: 6,
+    minPasswordLength: 8,
     async sendResetPassword({ user, url, token }) {
       await sendPasswordResetEmail({
         to: user.email,

@@ -51,7 +51,7 @@ export async function POST(
     await auth.api.requestPasswordReset({
       body: {
         email: targetUser.email,
-        redirectTo: `${appUrl}/login`,
+        redirectTo: `${appUrl}/reset-password`,
       },
       headers: req.headers,
     });

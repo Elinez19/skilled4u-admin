@@ -73,7 +73,9 @@ export function proxy(request: NextRequest) {
 
   if (isProtectedAdminRoute && !sessionCookie) {
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("callbackUrl", pathname);
+    if (pathname !== "/admin") {
+      loginUrl.searchParams.set("callbackUrl", pathname);
+    }
     return NextResponse.redirect(loginUrl);
   }
 
@@ -84,6 +86,7 @@ export function proxy(request: NextRequest) {
       const response = NextResponse.next();
       response.cookies.delete("better-auth.session_token");
       response.cookies.delete("__Secure-better-auth.session_token");
+      response.cookies.delete("skilled4u_admin_trusted_device");
       return response;
     }
     return NextResponse.redirect(new URL("/admin", request.url));

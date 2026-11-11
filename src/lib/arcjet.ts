@@ -138,23 +138,53 @@ function checkLocalSlidingWindow(
 
 /**
  * Protects POST /api/v1/auth/login against credential stuffing and brute force.
- * Limit: 10 attempts per 10 minutes per IP+Email.
+ * Dual-layer protection:
+ * 1. Account-level rate limit: max 10 attempts per 10 minutes per email (immune to IP rotation)
+ * 2. IP-level rate limit: max 30 attempts per 10 minutes per IP (blocks credential spraying)
  */
 export async function protectAuthLogin(
   req: NextRequest,
   email?: string
 ): Promise<NextResponse | null> {
-  const key = `login:${extractClientKey(req, email)}`;
-  const local = checkLocalSlidingWindow(key, 10 * 60 * 1000, 10);
-  if (!local.allowed) {
+  const normEmail = email?.trim().toLowerCase();
+
+  // 1. Account-level brute force protection
+  if (normEmail) {
+    const acctCheck = checkLocalSlidingWindow(
+      `login:acct:${normEmail}`,
+      10 * 60 * 1000,
+      10
+    );
+    if (!acctCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: `Too many sign-in attempts for this account. Please wait ${acctCheck.retryAfterSeconds} seconds before trying again.`,
+          code: "RATE_LIMITED",
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(acctCheck.retryAfterSeconds) },
+        }
+      );
+    }
+  }
+
+  // 2. IP-level spray protection
+  const clientIp = extractClientKey(req);
+  const ipCheck = checkLocalSlidingWindow(
+    `login:ip:${clientIp}`,
+    10 * 60 * 1000,
+    30
+  );
+  if (!ipCheck.allowed) {
     return NextResponse.json(
       {
-        error: `Too many sign-in attempts. Please wait ${local.retryAfterSeconds} seconds before trying again.`,
+        error: `Too many sign-in attempts from this network. Please wait ${ipCheck.retryAfterSeconds} seconds before trying again.`,
         code: "RATE_LIMITED",
       },
       {
         status: 429,
-        headers: { "Retry-After": String(local.retryAfterSeconds) },
+        headers: { "Retry-After": String(ipCheck.retryAfterSeconds) },
       }
     );
   }
@@ -183,24 +213,55 @@ export async function protectAuthLogin(
 
 /**
  * Protects POST /api/v1/auth/verify-otp against 6-digit OTP brute-forcing and email spam.
- * Limit: 5 attempts per 10 minutes per IP+Email+Action.
+ * Dual-layer protection:
+ * 1. Target account limit: max 5 attempts per 10 minutes per email (immune to IP rotation)
+ * 2. Network limit: max 20 attempts per 10 minutes per IP
  */
 export async function protectOtpEndpoint(
   req: NextRequest,
   email?: string,
   action?: string
 ): Promise<NextResponse | null> {
-  const key = `otp:${action || "verify"}:${extractClientKey(req, email)}`;
-  const local = checkLocalSlidingWindow(key, 10 * 60 * 1000, 5);
-  if (!local.allowed) {
+  const normEmail = email?.trim().toLowerCase();
+  const act = action || "verify";
+
+  // 1. Account-level OTP brute-force defense
+  if (normEmail) {
+    const acctCheck = checkLocalSlidingWindow(
+      `otp:${act}:acct:${normEmail}`,
+      10 * 60 * 1000,
+      5
+    );
+    if (!acctCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: `Too many OTP requests or verification attempts for this account. Please wait ${acctCheck.retryAfterSeconds} seconds.`,
+          code: "RATE_LIMITED",
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(acctCheck.retryAfterSeconds) },
+        }
+      );
+    }
+  }
+
+  // 2. IP-level spray defense
+  const clientIp = extractClientKey(req);
+  const ipCheck = checkLocalSlidingWindow(
+    `otp:${act}:ip:${clientIp}`,
+    10 * 60 * 1000,
+    20
+  );
+  if (!ipCheck.allowed) {
     return NextResponse.json(
       {
-        error: `Too many OTP requests or verification attempts. Please wait ${local.retryAfterSeconds} seconds.`,
+        error: `Too many OTP requests from this network. Please wait ${ipCheck.retryAfterSeconds} seconds.`,
         code: "RATE_LIMITED",
       },
       {
         status: 429,
-        headers: { "Retry-After": String(local.retryAfterSeconds) },
+        headers: { "Retry-After": String(ipCheck.retryAfterSeconds) },
       }
     );
   }

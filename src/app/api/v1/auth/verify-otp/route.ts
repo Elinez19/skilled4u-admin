@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import {
+  ADMIN_TRUSTED_DEVICE_COOKIE,
+  ADMIN_TRUSTED_DEVICE_TTL_SECONDS,
+  type AdminMfaChallengePayload,
   applyRoleSessionPolicy,
   buildOnboardingChecklist,
+  consumeAdminMfaChallenge,
+  createAdminTrustedDeviceToken,
   normalizeUserRole,
   resolveAdminScope,
   verifyAdminMfaChallengeToken,
@@ -53,6 +58,7 @@ export async function POST(req: NextRequest) {
       otp,
       type = "email-verification",
       mfaChallengeToken,
+      trustDevice,
       portal,
       newPassword,
     } = parsed.data;
@@ -99,15 +105,18 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "send") {
-      const result = await auth.api.sendVerificationOTP({
-        body: {
-          email: normalizedEmail,
-          type,
-        },
-      });
+      // Mitigate unauthenticated email bombing: only dispatch OTP if account exists
+      if (existingUser) {
+        await auth.api.sendVerificationOTP({
+          body: {
+            email: normalizedEmail,
+            type,
+          },
+        });
+      }
       return NextResponse.json({
         data: {
-          sent: result.success,
+          sent: true,
           email: normalizedEmail,
           type,
         },
@@ -249,6 +258,12 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      // Invalidate challenge token so it cannot be replayed
+      consumeAdminMfaChallenge(
+        challengeCheck.payload.jti,
+        challengeCheck.payload.expiresAt
+      );
+
       const otpSignInData = (await baResponse.json()) as {
         token?: string;
         user?: { id: string; email: string };
@@ -281,6 +296,7 @@ export async function POST(req: NextRequest) {
         data: {
           verified: true,
           mfaCompleted: true,
+          trustedDevice: Boolean(trustDevice),
           mustChangePassword: Boolean(existingUser.mustChangePassword),
           adminScope: resolveAdminScope(existingUser),
           token: rawToken,
@@ -299,6 +315,9 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      const isHttps =
+        req.nextUrl.protocol === "https:" ||
+        req.headers.get("x-forwarded-proto") === "https";
       const setCookieHeaders =
         typeof baResponse.headers.getSetCookie === "function"
           ? baResponse.headers.getSetCookie()
@@ -313,7 +332,6 @@ export async function POST(req: NextRequest) {
           response.headers.append("Set-Cookie", updatedCookie);
         }
       } else {
-        const isHttps = req.nextUrl.protocol === "https:";
         response.cookies.set(
           "better-auth.session_token",
           signBetterAuthSessionToken(rawToken),
@@ -327,6 +345,22 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      if (trustDevice) {
+        const trustedToken = createAdminTrustedDeviceToken({
+          userId: existingUser.id,
+          email: existingUser.email,
+        });
+        response.cookies.set(ADMIN_TRUSTED_DEVICE_COOKIE, trustedToken, {
+          httpOnly: true,
+          sameSite: "lax",
+          secure: isHttps,
+          path: "/",
+          maxAge: ADMIN_TRUSTED_DEVICE_TTL_SECONDS,
+        });
+      } else {
+        response.cookies.delete(ADMIN_TRUSTED_DEVICE_COOKIE);
+      }
+
       return response;
     }
 
@@ -338,7 +372,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Prevent bypassing Admin Step 1 password check via direct OTP sign-in without an mfaChallengeToken
+      let verifiedAdminChallenge: AdminMfaChallengePayload | null = null;
       if (existingUser && normalizeUserRole(existingUser.role) === "admin") {
         const challengeCheck = verifyAdminMfaChallengeToken(
           mfaChallengeToken,
@@ -354,6 +388,7 @@ export async function POST(req: NextRequest) {
             { status: 403 }
           );
         }
+        verifiedAdminChallenge = challengeCheck.payload;
       }
 
       const result = await auth.api.signInEmailOTP({
@@ -362,6 +397,13 @@ export async function POST(req: NextRequest) {
           otp: String(otp).trim(),
         },
       });
+
+      if (verifiedAdminChallenge) {
+        consumeAdminMfaChallenge(
+          verifiedAdminChallenge.jti,
+          verifiedAdminChallenge.expiresAt
+        );
+      }
 
       const [dbUser] = await db
         .select()

@@ -39,9 +39,13 @@ export function useAdminSession(
 
   const lastActivityRef = useRef<number>(0);
   const sessionMaxExpiresRef = useRef<number | null>(null);
+  const isSigningOutRef = useRef<boolean>(false);
 
   const handleSignOut = useCallback(
     async (reason?: "timeout" | "unauthorized") => {
+      if (isSigningOutRef.current) return;
+      isSigningOutRef.current = true;
+
       try {
         await Promise.allSettled([
           fetch("/api/v1/auth/logout", {
@@ -52,15 +56,15 @@ export function useAdminSession(
         ]);
       } finally {
         onBeforeSignOut?.();
-        const target = reason ? `/login?reason=${reason}` : "/login";
-        router.push(target);
-        router.refresh();
+        const target = reason === "timeout" ? "/login?reason=timeout" : "/login";
+        router.replace(target);
       }
     },
     [onBeforeSignOut, router]
   );
 
   const verifyAdminSession = useCallback(async () => {
+    if (isSigningOutRef.current) return;
     try {
       const res = await fetch("/api/v1/auth/me", {
         method: "GET",

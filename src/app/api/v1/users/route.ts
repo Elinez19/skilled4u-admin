@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
     const resolvedCity = city || "Abuja (Wuse II)";
     const resolvedPhone = phone || "+234 803 550 1920";
     const resolvedPassword =
-      (password && String(password).trim().length >= 6)
+      (password && String(password).trim().length >= 8)
         ? String(password).trim()
         : generateSecureTempPassword();
 

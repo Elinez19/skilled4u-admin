@@ -18,6 +18,12 @@ export const ADMIN_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     icon: "overview",
   },
   {
+    label: "UserManagement",
+    subtitle: "Customers, artisans & admins",
+    href: "/admin/user-management",
+    icon: "user-management",
+  },
+  {
     label: "Bookings",
     subtitle: "Manage bookings & dispatch",
     href: "/admin/bookings",
@@ -59,12 +65,7 @@ export const ADMIN_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     href: "/admin/support",
     icon: "support",
   },
-  {
-    label: "UserManagement",
-    subtitle: "Customers, artisans & admins",
-    href: "/admin/user-management",
-    icon: "user-management",
-  },
+  
 ] as const;
 
 export const ADMIN_PROFILE_SHORTCUTS: ReadonlyArray<AdminProfileShortcut> = [

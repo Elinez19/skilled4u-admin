@@ -62,6 +62,12 @@ export async function POST(req: NextRequest) {
       path: "/",
       maxAge: 0,
     });
+    response.cookies.set("skilled4u_admin_trusted_device", "", {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
 
     return response;
   } catch (error) {

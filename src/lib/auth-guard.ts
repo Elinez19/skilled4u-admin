@@ -100,44 +100,7 @@ export function resolveAdminScope(
     return user.adminScope;
   }
 
-  const email = (user.email || "").toLowerCase().trim();
-  if (
-    email === "admin@skilled4u.ng" ||
-    email === "elijahndenwa88@gmail.com"
-  ) {
-    return "super_admin";
-  }
-
-  const title = (user.adminRoleTitle || "").toLowerCase();
-  const perms = (user.adminPermissions || "").toLowerCase();
-
-  if (
-    title.includes("super") ||
-    perms.includes("full access") ||
-    perms.includes("super_admin")
-  ) {
-    return "super_admin";
-  }
-
-  if (
-    title.includes("kyc") ||
-    title.includes("trust") ||
-    title.includes("moderator") ||
-    perms.includes("kyc") ||
-    perms.includes("identity verification")
-  ) {
-    return "kyc_moderator";
-  }
-
-  if (
-    title.includes("dispatch") ||
-    title.includes("support") ||
-    title.includes("helpdesk")
-  ) {
-    return "dispatch_support";
-  }
-
-  // Least-privilege fallback instead of super_admin
+  // Least-privilege fallback instead of guessing from job title strings
   return "dispatch_support";
 }
 
@@ -273,8 +236,12 @@ export function verifyPortalRoleMatch(params: {
 
 // ---------------------------------------------------------------------------
 // Two-Step Admin Login MFA Challenge Token (HMAC-SHA256, 5-minute TTL)
+// & 30-Day Admin Trusted Device Token
 // ---------------------------------------------------------------------------
 const ADMIN_MFA_TTL_MS = 5 * 60 * 1000;
+export const ADMIN_TRUSTED_DEVICE_COOKIE = "skilled4u_admin_trusted_device";
+export const ADMIN_TRUSTED_DEVICE_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+const ADMIN_TRUSTED_DEVICE_TTL_MS = ADMIN_TRUSTED_DEVICE_TTL_SECONDS * 1000;
 
 export interface AdminMfaChallengePayload {
   userId: string;
@@ -282,6 +249,36 @@ export interface AdminMfaChallengePayload {
   purpose: "admin_mfa";
   issuedAt: number;
   expiresAt: number;
+  jti: string;
+}
+
+export interface AdminTrustedDevicePayload {
+  userId: string;
+  email: string;
+  purpose: "admin_trusted_device";
+  issuedAt: number;
+  expiresAt: number;
+}
+
+// In-memory single-use replay protection for MFA challenge tokens
+const consumedChallengeTokens = new Map<string, number>();
+
+function pruneConsumedChallenges() {
+  const now = Date.now();
+  for (const [jti, expiresAt] of consumedChallengeTokens.entries()) {
+    if (now > expiresAt) {
+      consumedChallengeTokens.delete(jti);
+    }
+  }
+}
+
+export function consumeAdminMfaChallenge(jti: string, expiresAt: number): boolean {
+  pruneConsumedChallenges();
+  if (consumedChallengeTokens.has(jti)) {
+    return false; // Already consumed
+  }
+  consumedChallengeTokens.set(jti, expiresAt);
+  return true;
 }
 
 function getMfaSigningSecret(): string {
@@ -303,6 +300,7 @@ export function createAdminMfaChallengeToken(params: {
     purpose: "admin_mfa",
     issuedAt: now,
     expiresAt: now + ADMIN_MFA_TTL_MS,
+    jti: crypto.randomUUID(),
   };
   const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString(
     "base64url"
@@ -349,7 +347,7 @@ export function verifyAdminMfaChallengeToken(
       Buffer.from(encoded, "base64url").toString("utf8")
     ) as AdminMfaChallengePayload;
 
-    if (decoded.purpose !== "admin_mfa" || !decoded.userId || !decoded.email) {
+    if (decoded.purpose !== "admin_mfa" || !decoded.userId || !decoded.email || !decoded.jti) {
       return { ok: false, error: "Invalid Admin MFA challenge payload" };
     }
 
@@ -371,10 +369,109 @@ export function verifyAdminMfaChallengeToken(
       };
     }
 
+    if (consumedChallengeTokens.has(decoded.jti)) {
+      return {
+        ok: false,
+        error: "Admin MFA challenge token has already been used. Please sign in again.",
+      };
+    }
+
     return { ok: true, payload: decoded };
   } catch {
     return { ok: false, error: "Failed to decode Admin MFA challenge token" };
   }
+}
+
+export function createAdminTrustedDeviceToken(params: {
+  userId: string;
+  email: string;
+}): string {
+  const now = Date.now();
+  const payload: AdminTrustedDevicePayload = {
+    userId: params.userId,
+    email: params.email.toLowerCase().trim(),
+    purpose: "admin_trusted_device",
+    issuedAt: now,
+    expiresAt: now + ADMIN_TRUSTED_DEVICE_TTL_MS,
+  };
+  const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString(
+    "base64url"
+  );
+  const sig = crypto
+    .createHmac("sha256", getMfaSigningSecret())
+    .update(`admin-trusted-device:${encoded}`)
+    .digest("base64url");
+  return `${encoded}.${sig}`;
+}
+
+export function verifyAdminTrustedDeviceToken(
+  token: string | null | undefined,
+  expectedUserId: string,
+  expectedEmail: string,
+  userUpdatedAt?: Date | string | null
+): boolean {
+  if (!token || !token.includes(".")) return false;
+  const parts = token.split(".");
+  if (parts.length !== 2) return false;
+
+  const [encoded, providedSig] = parts;
+  const expectedSig = crypto
+    .createHmac("sha256", getMfaSigningSecret())
+    .update(`admin-trusted-device:${encoded}`)
+    .digest("base64url");
+
+  const bufA = Buffer.from(providedSig, "utf8");
+  const bufB = Buffer.from(expectedSig, "utf8");
+  if (bufA.length !== bufB.length || !crypto.timingSafeEqual(bufA, bufB)) {
+    return false;
+  }
+
+  try {
+    const decoded = JSON.parse(
+      Buffer.from(encoded, "base64url").toString("utf8")
+    ) as AdminTrustedDevicePayload;
+
+    if (
+      decoded.purpose !== "admin_trusted_device" ||
+      decoded.userId !== expectedUserId ||
+      decoded.email.toLowerCase() !== expectedEmail.toLowerCase().trim()
+    ) {
+      return false;
+    }
+
+    if (Date.now() > decoded.expiresAt) {
+      return false;
+    }
+
+    // Invalidate if token was issued prior to user's last security update (e.g. password change or session revocation)
+    if (userUpdatedAt) {
+      const updatedMs = new Date(userUpdatedAt).getTime();
+      // Allow 5s clock skew
+      if (decoded.issuedAt < updatedMs - 5000) {
+        return false;
+      }
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function hasValidAdminTrustedDeviceCookie(
+  req: Request,
+  userId: string,
+  email: string,
+  userUpdatedAt?: Date | string | null
+): boolean {
+  const cookieHeader = req.headers.get("cookie") || "";
+  const regex = new RegExp(
+    `(?:^|;\\s*)${ADMIN_TRUSTED_DEVICE_COOKIE}=([^;]+)`
+  );
+  const match = cookieHeader.match(regex);
+  if (!match?.[1]) return false;
+  const rawToken = decodeURIComponent(match[1].trim());
+  return verifyAdminTrustedDeviceToken(rawToken, userId, email, userUpdatedAt);
 }
 
 export function computeSessionPolicy(
@@ -469,7 +566,27 @@ function extractRawTokenFromRequest(req: Request): string | null {
   );
   if (match?.[1]) {
     const decoded = decodeURIComponent(match[1].trim());
-    return decoded.includes(".") ? decoded.split(".")[0] : decoded;
+    if (decoded.includes(".")) {
+      const parts = decoded.split(".");
+      const rawToken = parts[0];
+      const providedSig = parts.slice(1).join(".");
+      try {
+        const secret = getMfaSigningSecret();
+        const expectedSig = crypto
+          .createHmac("sha256", secret)
+          .update(rawToken)
+          .digest("base64");
+        const bufA = Buffer.from(providedSig, "utf8");
+        const bufB = Buffer.from(expectedSig, "utf8");
+        if (bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB)) {
+          return rawToken;
+        }
+      } catch {
+        // Fallback for native Better Auth internal signing
+      }
+      return rawToken;
+    }
+    return decoded;
   }
 
   return null;

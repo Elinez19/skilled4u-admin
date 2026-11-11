@@ -5,6 +5,7 @@ import {
   applyRoleSessionPolicy,
   buildOnboardingChecklist,
   createAdminMfaChallengeToken,
+  hasValidAdminTrustedDeviceCookie,
   normalizeUserRole,
   resolveAdminScope,
   verifyPortalRoleMatch,
@@ -161,10 +162,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 4. MANDATORY TWO-STEP ADMIN MFA:
-    // For Administrators, revoke the preliminary password-only session immediately,
-    // dispatch a 6-digit Email OTP, and return an HMAC-signed 5-minute mfaChallengeToken.
-    if (role === "admin" || portal === "admin") {
+    // 4. TWO-STEP ADMIN MFA (WITH 30-DAY TRUSTED DEVICE BYPASS):
+    // For Administrators without a valid 30-day trusted device cookie (or on first-time login),
+    // revoke the preliminary password-only session immediately, dispatch a 6-digit Email OTP,
+    // and return an HMAC-signed 5-minute mfaChallengeToken.
+    const isAdminLogin = role === "admin" || portal === "admin";
+    const isTrustedAdminDevice =
+      isAdminLogin &&
+      !dbUser.mustChangePassword &&
+      hasValidAdminTrustedDeviceCookie(req, dbUser.id, dbUser.email, dbUser.updatedAt);
+
+    if (isAdminLogin && !isTrustedAdminDevice) {
       await db.delete(sessionTable).where(eq(sessionTable.token, baseToken));
 
       await auth.api.sendVerificationOTP({
@@ -224,6 +232,9 @@ export async function POST(req: NextRequest) {
     const response = NextResponse.json({
       data: {
         mfaRequired: false,
+        trustedDevice: isTrustedAdminDevice,
+        mustChangePassword: Boolean(dbUser.mustChangePassword),
+        adminScope: role === "admin" ? resolveAdminScope(dbUser) : null,
         user: dbUser,
         token: rawToken,
         session: sessionRow

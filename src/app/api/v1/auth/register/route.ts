@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         {
           error:
             parsed.error.issues[0]?.message ||
-            "Name, valid email, and password (min 6 characters) are required",
+            "Name, valid email, and password (min 8 characters) are required",
           code: "VALIDATION_ERROR",
         },
         { status: 400 }

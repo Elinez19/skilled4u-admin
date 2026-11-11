@@ -1,11 +1,12 @@
 "use client";
 
-import * as React from "react";
 import { ArrowRight, KeyRound, Loader2, Lock, ShieldAlert } from "lucide-react";
 import { AdminTextField } from "@/components/admin/ui/admin-form-controls";
 import { CtaButton } from "@/components/landing/ui/cta-button";
 
 export interface AdminPasswordChangeStepProps {
+  currentPassword?: string;
+  setCurrentPassword?: (p: string) => void;
   newPassword: string;
   setNewPassword: (p: string) => void;
   confirmNewPassword: string;
@@ -17,6 +18,8 @@ export interface AdminPasswordChangeStepProps {
 }
 
 export function AdminPasswordChangeStep({
+  currentPassword,
+  setCurrentPassword,
   newPassword,
   setNewPassword,
   confirmNewPassword,
@@ -28,6 +31,19 @@ export function AdminPasswordChangeStep({
 }: AdminPasswordChangeStepProps) {
   return (
     <form onSubmit={onSubmit} className="space-y-3.5">
+      {setCurrentPassword && (
+        <AdminTextField
+          label="Current / Temporary Password"
+          type={showPassword ? "text" : "password"}
+          value={currentPassword || ""}
+          autoComplete="current-password"
+          onChange={(e) => setCurrentPassword(e.target.value)}
+          placeholder="Enter current or temporary password"
+          leadingIcon={<Lock className="h-4 w-4" />}
+          required
+        />
+      )}
+
       <AdminTextField
         label="New Personal Password (Min 8 Characters)"
         type={showPassword ? "text" : "password"}
@@ -81,4 +97,3 @@ export function AdminPasswordChangeStep({
     </form>
   );
 }
-

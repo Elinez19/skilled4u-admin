@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -15,6 +14,8 @@ import { CtaButton } from "@/components/landing/ui/cta-button";
 export interface AdminMfaStepProps {
   otp: string;
   setOtp: (otp: string) => void;
+  trustDevice?: boolean;
+  setTrustDevice?: (trust: boolean) => void;
   loading: boolean;
   resendingOtp: boolean;
   error: string | null;
@@ -26,6 +27,8 @@ export interface AdminMfaStepProps {
 export function AdminMfaStep({
   otp,
   setOtp,
+  trustDevice = true,
+  setTrustDevice,
   loading,
   resendingOtp,
   error,
@@ -34,7 +37,7 @@ export function AdminMfaStep({
   onResendOtp,
 }: AdminMfaStepProps) {
   return (
-    <form onSubmit={onSubmit} className="space-y-3.5">
+    <form onSubmit={onSubmit} autoComplete="off" className="space-y-3.5">
       <AdminTextField
         label="6-Digit Security Code"
         type="text"
@@ -49,6 +52,18 @@ export function AdminMfaStep({
         leadingIcon={<ShieldCheck className="h-4 w-4" />}
         required
       />
+
+      {setTrustDevice && (
+        <label className="flex items-center gap-2.5 rounded-xl border border-brand-200/80 bg-brand-50/60 px-3 py-2.5 text-xs font-semibold text-brand-950 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={trustDevice}
+            onChange={(e) => setTrustDevice(e.target.checked)}
+            className="h-4 w-4 rounded border-brand-300 text-brand-700 focus:ring-accent-sky cursor-pointer"
+          />
+          <span>Trust this device</span>
+        </label>
+      )}
 
       {error && (
         <div className="flex items-start gap-2 rounded-xl border-2 border-accent-warm bg-surface-mist p-3 text-xs font-bold text-accent-warm-deep">

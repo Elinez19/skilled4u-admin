@@ -38,7 +38,7 @@ export const registerSchema = z.object({
     .transform((v) => v.toLowerCase()),
   password: z
     .string()
-    .min(6, "Password must be at least 6 characters")
+    .min(8, "Password must be at least 8 characters")
     .max(128, "Password is too long"),
   role: z
     .enum(["customer", "client", "artisan", "admin"])
@@ -80,10 +80,11 @@ export const verifyOtpSchema = z.object({
     .regex(/^\d{6}$/, "OTP must be a 6-digit numeric code")
     .optional(),
   mfaChallengeToken: z.string().trim().optional(),
+  trustDevice: z.boolean().optional().default(true),
   portal: portalEnum.optional(),
   newPassword: z
     .string()
-    .min(6, "New password must be at least 6 characters")
+    .min(8, "New password must be at least 8 characters")
     .max(128)
     .optional(),
 });
@@ -99,6 +100,45 @@ export const changePasswordSchema = z.object({
     .max(128),
   revokeOtherSessions: z.boolean().optional().default(true),
 });
+
+export const forgotPasswordSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(3, "Email address is required")
+    .email("Please enter a valid email address")
+    .transform((v) => v.toLowerCase()),
+  portal: portalEnum.optional(),
+  deliveryMethod: z.enum(["otp", "link", "both"]).optional().default("both"),
+});
+
+export const resetPasswordSchema = z
+  .object({
+    email: z
+      .string()
+      .trim()
+      .email("Please enter a valid email address")
+      .transform((v) => v.toLowerCase())
+      .optional(),
+    otp: z
+      .string()
+      .trim()
+      .regex(/^\d{6}$/, "OTP must be a 6-digit numeric code")
+      .optional(),
+    token: z.string().trim().optional(),
+    newPassword: z
+      .string()
+      .min(8, "New password must be at least 8 characters")
+      .max(128, "Password is too long"),
+    portal: portalEnum.optional(),
+  })
+  .refine(
+    (data) => Boolean((data.email && data.otp) || data.token),
+    {
+      message: "Either a 6-digit OTP code with email or a reset token is required",
+      path: ["otp"],
+    }
+  );
 
 export const customerOnboardingSchema = z.object({
   name: z.string().trim().min(2).max(120).optional(),

@@ -23,6 +23,7 @@ export interface AdminCredentialsStepProps {
   loading: boolean;
   error: string | null;
   onSubmit: (e: React.FormEvent) => void;
+  onForgotPassword?: () => void;
 }
 
 export function AdminCredentialsStep({
@@ -35,16 +36,52 @@ export function AdminCredentialsStep({
   loading,
   error,
   onSubmit,
+  onForgotPassword,
 }: AdminCredentialsStepProps) {
+  const [fieldsUnlocked, setFieldsUnlocked] = React.useState(false);
+
+  React.useEffect(() => {
+    setEmail("");
+    setPassword("");
+  }, [setEmail, setPassword]);
+
+  const unlockFields = React.useCallback(() => {
+    if (!fieldsUnlocked) {
+      setFieldsUnlocked(true);
+    }
+  }, [fieldsUnlocked]);
+
   return (
-    <form onSubmit={onSubmit} className="space-y-3.5">
+    <form onSubmit={onSubmit} autoComplete="off" className="space-y-3.5">
+      {/* Hidden decoy inputs to prevent browser password managers from auto-filling */}
+      <input
+        type="text"
+        name="prevent_autofill_email"
+        autoComplete="username"
+        tabIndex={-1}
+        aria-hidden="true"
+        className="sr-only"
+      />
+      <input
+        type="password"
+        name="prevent_autofill_password"
+        autoComplete="current-password"
+        tabIndex={-1}
+        aria-hidden="true"
+        className="sr-only"
+      />
+
       <AdminTextField
         label="Administrator Email Address"
         type="email"
+        name="admin_portal_email_entry"
         value={email}
-        autoComplete="email"
+        readOnly={!fieldsUnlocked}
+        onFocus={unlockFields}
+        onPointerDown={unlockFields}
+        autoComplete="off"
         onChange={(e) => setEmail(e.target.value)}
-        placeholder="admin@skilled4u.ng"
+        placeholder="Enter your email address"
         leadingIcon={<Mail className="h-4 w-4" />}
         required
       />
@@ -52,10 +89,14 @@ export function AdminCredentialsStep({
       <AdminTextField
         label="Password"
         type={showPassword ? "text" : "password"}
+        name="admin_portal_password_entry"
         value={password}
-        autoComplete="current-password"
+        readOnly={!fieldsUnlocked}
+        onFocus={unlockFields}
+        onPointerDown={unlockFields}
+        autoComplete="new-password"
         onChange={(e) => setPassword(e.target.value)}
-        placeholder="••••••••"
+        placeholder="Enter your password"
         leadingIcon={<KeyRound className="h-4 w-4" />}
         trailingIcon={
           <button
@@ -73,6 +114,18 @@ export function AdminCredentialsStep({
         }
         required
       />
+
+      {onForgotPassword && (
+        <div className="flex justify-end -mt-1 pb-0.5">
+          <button
+            type="button"
+            onClick={onForgotPassword}
+            className="text-xs font-bold text-brand-700 hover:text-brand-950 transition-colors focus:outline-none focus-visible:underline cursor-pointer"
+          >
+            Forgot password?
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="flex items-start gap-2 rounded-xl border-2 border-accent-warm bg-surface-mist p-3 text-xs font-bold text-accent-warm-deep">
@@ -92,11 +145,11 @@ export function AdminCredentialsStep({
           {loading ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Verifying Credentials...</span>
+              <span>Logging in...</span>
             </>
           ) : (
             <>
-              <span>Continue to 6-Digit OTP</span>
+              <span>Login to portal</span>
               <ArrowRight className="h-4 w-4" />
             </>
           )}
