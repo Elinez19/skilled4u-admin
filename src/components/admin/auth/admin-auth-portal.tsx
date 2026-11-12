@@ -83,7 +83,7 @@ export function AdminAuthPortal({
 
   return (
     <div className="surface-viewport-gloss-pearl min-h-screen px-3 sm:px-5 lg:px-7 py-5 sm:py-8 flex items-center justify-center">
-      <ScaleSlab className="surface-slab-blue relative mx-auto w-full max-w-slab overflow-hidden rounded-slab shadow-gloss-float">
+      <ScaleSlab priority className="surface-slab-blue relative mx-auto w-full max-w-slab overflow-hidden rounded-slab shadow-gloss-float">
         {/* Background Atmosphere Texture */}
         <div className="pointer-events-none absolute inset-0 select-none opacity-20">
           <Image
@@ -106,7 +106,7 @@ export function AdminAuthPortal({
         <div className="relative z-10 mx-auto max-w-5xl px-5 sm:px-8 lg:px-10 py-8 sm:py-11 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-center">
           {/* Left 6 Cols: Brand Identity, Security Narrative & OffsetRing Motifs */}
           <div className="lg:col-span-6 space-y-4 text-left">
-            <Reveal className="flex flex-wrap items-center gap-2.5">
+            <Reveal priority className="flex flex-wrap items-center gap-2.5">
               <Link href="/admin" className="group focus:outline-none">
                 <BrandLogo tone="on-blue" size="md" />
               </Link>
@@ -124,6 +124,7 @@ export function AdminAuthPortal({
             </Reveal>
 
             <AnimatedText
+              priority
               as="h1"
               text="Skilled4U Admin Portal."
               highlightWords={["Admin", "Portal"]}
@@ -131,13 +132,14 @@ export function AdminAuthPortal({
               className="text-3xl sm:text-4xl lg:text-[42px] font-extrabold leading-[1.02] tracking-tight text-ink-on-blue drop-shadow-sm"
             />
 
-            <Reveal delay={0.14}>
+            <Reveal priority delay={0.14}>
               <p className="max-w-md text-xs sm:text-sm font-semibold leading-relaxed text-ink-on-blue-muted">
                 Manage artisans and customers. View bookings and support requests.
               </p>
             </Reveal>
 
             <Reveal
+              priority
               delay={0.22}
               className="pt-1 flex flex-wrap items-center gap-4"
             >

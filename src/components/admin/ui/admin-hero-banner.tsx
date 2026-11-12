@@ -49,6 +49,7 @@ export function AdminHeroBanner({
 }: AdminHeroBannerProps) {
   return (
     <ScaleSlab
+      priority
       className={cn(
         "relative w-full overflow-hidden rounded-slab",
         tone === "blue" ? "surface-slab-blue" : "surface-slab-ink"
@@ -77,7 +78,7 @@ export function AdminHeroBanner({
       <div className="relative z-10 px-5 sm:px-7 lg:px-8 py-5 sm:py-6">
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5">
           <div className="max-w-2xl text-left">
-            <Reveal>
+            <Reveal priority>
               <PillBadge
                 tone="porcelain"
                 icon={eyebrowIcon}
@@ -89,6 +90,7 @@ export function AdminHeroBanner({
 
             <div className="mt-2.5">
               <AnimatedText
+                priority
                 as="h1"
                 text={headline}
                 highlightWords={highlightWords}
@@ -97,7 +99,7 @@ export function AdminHeroBanner({
               />
             </div>
 
-            <Reveal delay={0.14}>
+            <Reveal priority delay={0.14}>
               <p className="mt-2 max-w-xl text-xs sm:text-[13px] font-semibold leading-relaxed text-ink-on-blue-muted">
                 {subtitle}
               </p>
@@ -105,6 +107,7 @@ export function AdminHeroBanner({
 
             {(primaryCta || secondaryCta) && (
               <Reveal
+                priority
                 delay={0.22}
                 className="mt-4 flex flex-wrap items-center gap-2.5"
               >
@@ -137,7 +140,7 @@ export function AdminHeroBanner({
           </div>
 
           {rightSlot && (
-            <Reveal delay={0.18} className="shrink-0">
+            <Reveal priority delay={0.18} className="shrink-0">
               {rightSlot}
             </Reveal>
           )}
@@ -153,6 +156,7 @@ export interface AdminWorkspaceSlabProps {
   withPearlAsset?: boolean;
   className?: string;
   innerClassName?: string;
+  priority?: boolean;
   children: React.ReactNode;
 }
 
@@ -167,6 +171,7 @@ export function AdminWorkspaceSlab({
   withPearlAsset = true,
   className,
   innerClassName,
+  priority = false,
   children,
 }: AdminWorkspaceSlabProps) {
   const slabClasses: Record<SlabTone, string> = {
@@ -178,6 +183,7 @@ export function AdminWorkspaceSlab({
   return (
     <section id={id} className={cn("w-full", className)}>
       <ScaleSlab
+        priority={priority}
         className={cn("relative w-full overflow-hidden", slabClasses[tone])}
       >
         {tone === "pearl" && withPearlAsset && (

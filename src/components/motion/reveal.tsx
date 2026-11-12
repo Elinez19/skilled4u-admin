@@ -14,6 +14,7 @@ export interface RevealProps extends HTMLMotionProps<"div"> {
   y?: number;
   once?: boolean;
   amount?: number | "some" | "all";
+  priority?: boolean;
 }
 
 export function Reveal({
@@ -22,15 +23,18 @@ export function Reveal({
   y = 40,
   once = true,
   amount = "some",
+  priority = false,
   ...props
 }: RevealProps) {
   const prefersReducedMotion = useReducedMotion();
+  const shouldSkipAnimation = prefersReducedMotion || priority;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: prefersReducedMotion ? 0 : y }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once, amount }}
+      initial={shouldSkipAnimation ? false : { opacity: 0, y }}
+      animate={priority ? { opacity: 1, y: 0 } : undefined}
+      whileInView={priority ? undefined : { opacity: 1, y: 0 }}
+      viewport={{ once, amount: priority ? 0 : amount }}
       transition={{
         duration: motionTokens.duration.base,
         delay,
@@ -87,17 +91,25 @@ export function StaggerItem({
   );
 }
 
+export interface ScaleSlabProps extends HTMLMotionProps<"section"> {
+  priority?: boolean;
+}
+
 export function ScaleSlab({
   children,
+  priority = false,
   ...props
-}: HTMLMotionProps<"section">) {
+}: ScaleSlabProps) {
   const prefersReducedMotion = useReducedMotion();
+  const shouldSkipInitial = prefersReducedMotion || priority;
+
   return (
     <motion.section
       variants={prefersReducedMotion ? undefined : scaleSlabVariants}
-      initial={prefersReducedMotion ? { opacity: 1 } : "hidden"}
-      whileInView={prefersReducedMotion ? { opacity: 1 } : "visible"}
-      viewport={{ once: true, amount: "some" }}
+      initial={shouldSkipInitial ? false : "hidden"}
+      animate={priority ? "visible" : undefined}
+      whileInView={priority ? undefined : prefersReducedMotion ? { opacity: 1 } : "visible"}
+      viewport={{ once: true, amount: 0 }}
       {...props}
     >
       {children}

@@ -15,6 +15,7 @@ export interface AnimatedTextProps {
   delay?: number;
   stagger?: number;
   underlineLastWord?: boolean;
+  priority?: boolean;
 }
 
 export function AnimatedText({
@@ -26,8 +27,10 @@ export function AnimatedText({
   delay = 0,
   stagger = motionTokens.stagger.words,
   underlineLastWord = false,
+  priority = false,
 }: AnimatedTextProps) {
   const prefersReducedMotion = useReducedMotion();
+  const shouldSkipInitial = prefersReducedMotion || priority;
   const words = text.split(" ");
   const normalizedHighlights = new Set(
     highlightWords.map((w) => w.toLowerCase().replace(/[^a-z0-9]/gi, ""))
@@ -36,9 +39,10 @@ export function AnimatedText({
   return (
     <Tag className={cn("font-display tracking-tight", className)}>
       <motion.span
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, amount: 0.35 }}
+        initial={shouldSkipInitial ? false : "hidden"}
+        animate={priority ? "visible" : undefined}
+        whileInView={priority ? undefined : "visible"}
+        viewport={{ once: true, amount: priority ? 0 : 0.35 }}
         variants={{
           hidden: {},
           visible: {
