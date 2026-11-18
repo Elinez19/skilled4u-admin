@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { sanitizeAuthErrorMessage } from "@/lib/utils";
 
 export type AuthStep =
@@ -58,7 +58,6 @@ export interface UseAdminAuthReturn {
 }
 
 export function useAdminAuth(options: UseAdminAuthOptions = {}): UseAdminAuthReturn {
-  const router = useRouter();
   const pathname = usePathname();
   const [step, setStep] = useState<AuthStep>(options.initialStep || "credentials");
   const [email, setEmail] = useState(options.initialEmail || "");
@@ -223,8 +222,8 @@ export function useAdminAuth(options: UseAdminAuthOptions = {}): UseAdminAuthRet
 
         const targetUrl = callbackUrl || "/admin";
         clearAuthFields();
-        router.replace(targetUrl);
-        router.refresh();
+        // Hard navigation bypasses any pre-auth client router cache / RSC prefetch for /admin
+        window.location.replace(targetUrl);
       } catch {
         setError(
           "Unable to connect to the authentication service. Please check your internet connection."
@@ -232,7 +231,7 @@ export function useAdminAuth(options: UseAdminAuthOptions = {}): UseAdminAuthRet
         setLoading(false);
       }
     },
-    [callbackUrl, clearAuthFields, email, password, router]
+    [callbackUrl, clearAuthFields, email, password]
   );
 
   const handleMfaSubmit = useCallback(
@@ -283,8 +282,7 @@ export function useAdminAuth(options: UseAdminAuthOptions = {}): UseAdminAuthRet
 
         const targetUrl = callbackUrl || "/admin";
         clearAuthFields();
-        router.replace(targetUrl);
-        router.refresh();
+        window.location.replace(targetUrl);
       } catch {
         setError(
           "Verification failed due to a network error. Please try again."
@@ -299,7 +297,6 @@ export function useAdminAuth(options: UseAdminAuthOptions = {}): UseAdminAuthRet
       mfaChallengeToken,
       mfaEmail,
       otp,
-      router,
       trustDevice,
     ]
   );
@@ -384,8 +381,7 @@ export function useAdminAuth(options: UseAdminAuthOptions = {}): UseAdminAuthRet
 
         const targetUrl = callbackUrl || "/admin";
         clearAuthFields();
-        router.replace(targetUrl);
-        router.refresh();
+        window.location.replace(targetUrl);
       } catch {
         setError(
           "Password update failed due to a connection issue. Please try again."
@@ -393,7 +389,7 @@ export function useAdminAuth(options: UseAdminAuthOptions = {}): UseAdminAuthRet
         setLoading(false);
       }
     },
-    [callbackUrl, clearAuthFields, confirmNewPassword, newPassword, password, router]
+    [callbackUrl, clearAuthFields, confirmNewPassword, newPassword, password]
   );
 
   const handleForgotPasswordSubmit = useCallback(

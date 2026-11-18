@@ -590,45 +590,61 @@ export async function applyRoleSessionPolicy(
   return computeSessionPolicy(role, expiresAt, now);
 }
 
-function extractRawTokenFromRequest(req: Request): string | null {
+function decodeSessionCookieToken(rawCookieValue: string): string | null {
+  const decoded = decodeURIComponent(rawCookieValue.trim());
+  if (!decoded) return null;
+  if (decoded.includes(".")) {
+    const parts = decoded.split(".");
+    const rawToken = parts[0];
+    const providedSig = parts.slice(1).join(".");
+    try {
+      const secret = getMfaSigningSecret();
+      const expectedSig = crypto
+        .createHmac("sha256", secret)
+        .update(rawToken)
+        .digest("base64");
+      const bufA = Buffer.from(providedSig, "utf8");
+      const bufB = Buffer.from(expectedSig, "utf8");
+      if (bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB)) {
+        return rawToken;
+      }
+    } catch {
+      // Fallback for native Better Auth internal signing
+    }
+    return rawToken;
+  }
+  return decoded;
+}
+
+function extractRawTokensFromRequest(req: Request): string[] {
+  const tokens: string[] = [];
   const authHeader = req.headers.get("authorization");
   if (authHeader?.toLowerCase().startsWith("bearer ")) {
     const raw = authHeader.slice(7).trim();
     if (raw) {
-      return raw.includes(".") ? raw.split(".")[0] : raw;
+      tokens.push(raw.includes(".") ? raw.split(".")[0] : raw);
     }
   }
 
   const cookieHeader = req.headers.get("cookie") || "";
-  const match = cookieHeader.match(
-    /(?:__Secure-)?better-auth\.session_token=([^;]+)/
-  );
-  if (match?.[1]) {
-    const decoded = decodeURIComponent(match[1].trim());
-    if (decoded.includes(".")) {
-      const parts = decoded.split(".");
-      const rawToken = parts[0];
-      const providedSig = parts.slice(1).join(".");
-      try {
-        const secret = getMfaSigningSecret();
-        const expectedSig = crypto
-          .createHmac("sha256", secret)
-          .update(rawToken)
-          .digest("base64");
-        const bufA = Buffer.from(providedSig, "utf8");
-        const bufB = Buffer.from(expectedSig, "utf8");
-        if (bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB)) {
-          return rawToken;
-        }
-      } catch {
-        // Fallback for native Better Auth internal signing
+  // Prefer HTTPS __Secure- cookie before plain cookie so a stale non-secure cookie never masks a valid session
+  const secureMatches = [
+    ...cookieHeader.matchAll(/(?:^|;\s*)__Secure-better-auth\.session_token=([^;]+)/g),
+  ];
+  const plainMatches = [
+    ...cookieHeader.matchAll(/(?:^|;\s*)better-auth\.session_token=([^;]+)/g),
+  ];
+
+  for (const m of [...secureMatches, ...plainMatches]) {
+    if (m[1]) {
+      const parsed = decodeSessionCookieToken(m[1]);
+      if (parsed && !tokens.includes(parsed)) {
+        tokens.push(parsed);
       }
-      return rawToken;
     }
-    return decoded;
   }
 
-  return null;
+  return tokens;
 }
 
 /**
@@ -640,9 +656,9 @@ export async function resolveAuthSessionDetailed(
 ): Promise<DetailedAuthResolution> {
   let foundSession: typeof sessionTable.$inferSelect | null = null;
 
-  // 1. Check raw token from Authorization Bearer header or session cookie directly in NeonDB
-  const candidateToken = extractRawTokenFromRequest(req);
-  if (candidateToken) {
+  // 1. Check raw token(s) from Authorization Bearer header or session cookies directly in NeonDB
+  const candidateTokens = extractRawTokensFromRequest(req);
+  for (const candidateToken of candidateTokens) {
     const [row] = await db
       .select()
       .from(sessionTable)
@@ -650,6 +666,7 @@ export async function resolveAuthSessionDetailed(
       .limit(1);
     if (row) {
       foundSession = row;
+      break;
     }
   }
 
@@ -950,7 +967,7 @@ export async function requireAdminPage(
 
   const authCtx = await resolveAuthSession(dummyReq);
   if (!authCtx || normalizeUserRole(authCtx.user.role) !== "admin") {
-    redirect("/login");
+    redirect("/login?reason=unauthorized");
   }
 
   const scope = authCtx.adminScope || resolveAdminScope(authCtx.user);

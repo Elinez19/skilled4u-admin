@@ -171,7 +171,7 @@ export function AdminWorkspaceSlab({
   withPearlAsset = true,
   className,
   innerClassName,
-  priority = false,
+  priority = true,
   children,
 }: AdminWorkspaceSlabProps) {
   const slabClasses: Record<SlabTone, string> = {

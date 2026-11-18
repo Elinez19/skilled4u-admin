@@ -107,7 +107,7 @@ export function AdminAuthPortal({
           {/* Left 6 Cols: Brand Identity, Security Narrative & OffsetRing Motifs */}
           <div className="lg:col-span-6 space-y-4 text-left">
             <Reveal priority className="flex flex-wrap items-center gap-2.5">
-              <Link href="/admin" className="group focus:outline-none">
+              <Link href="/admin" prefetch={false} className="group focus:outline-none">
                 <BrandLogo tone="on-blue" size="md" />
               </Link>
               <PillBadge
